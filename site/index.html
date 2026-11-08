@@ -73,6 +73,8 @@ details[open] summary::before{content:"▾ "}
 .empty{color:var(--muted);text-align:center;padding:60px 0}
 .note{color:var(--faint);font-size:12px;margin-top:30px;line-height:1.7}
 .books{font-size:11px;color:var(--faint)}
+#ideasPanel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
+#ideasPanel h2{font-size:15px;margin:0 0 4px}#ideasPanel h3{font-size:13px;margin:16px 0 6px;color:var(--muted);font-weight:500}#ideasPanel p{color:var(--muted);font-size:12.5px}
 #hist{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
 #hist h2{font-size:15px;margin:0 0 4px}
 #hist h3{font-size:13px;margin:18px 0 6px;color:var(--muted);font-weight:500}
@@ -83,6 +85,24 @@ details[open] summary::before{content:"▾ "}
 .ht td:first-child,.ht th:first-child{text-align:left}
 .pos{color:var(--good)}.neg{color:var(--up)}
 .scroll{overflow-x:auto}
+.card{cursor:pointer}
+.card:hover{border-color:color-mix(in srgb,var(--text) 25%,var(--line))}
+#dlg{position:fixed;inset:0;z-index:20;background:color-mix(in srgb,#000 55%,transparent);display:none;overflow-y:auto;padding:24px 16px}
+#dlg.on{display:block}
+#dlg .box{max-width:860px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 24px}
+#dlg .x{float:right;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:4px 10px;cursor:pointer}
+#dlg h2{font-size:18px;margin:4px 0 2px}
+#dlg h3{font-size:14px;margin:22px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+#dlg .hint{color:var(--muted);font-size:12px;margin:2px 0 8px;line-height:1.6}
+.kv{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin:6px 0}
+.kv b{font-size:15px}
+.big .spark,#dlg .spk .spark{width:100%;height:64px}
+.mk.big{grid-template-columns:52px minmax(0,1fr)}
+.mk.big .spk{grid-column:1/-1}
+.btn{display:inline-block;background:var(--warn);color:#14110a;border-radius:9px;padding:8px 14px;font-weight:600;text-decoration:none;font-size:13px}
+.idea{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:13px}
+.idea .st{float:right;font-size:12px}
+.judge td:nth-child(n+2){text-align:right}
 @media (max-width:420px){.grid{grid-template-columns:1fr}.mk{grid-template-columns:46px minmax(0,1fr) 64px}.spark{width:64px}.row .lbl{min-width:44px}}
 </style>
 </head>
@@ -98,9 +118,11 @@ details[open] summary::before{content:"▾ "}
     <span class="chip" id="onlyFlags">只看有信号</span>
     <span class="chip" id="sortScore">按信号强度排序</span>
     <span class="chip" id="histTab">历史规律</span>
+    <span class="chip" id="ideasTab">思路战绩</span>
   </div>
 </div></header>
-<main class="wrap"><div id="hist" hidden></div><div id="list"><div class="empty">加载中…</div></div>
+<div id="dlg"><div class="box" id="dlgBox"></div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">
   只显示选定的联赛：英超、澳超、欧冠、西甲、意甲、德甲、法甲、美职联、墨西哥 Liga MX、欧联杯/欧协联、巴甲、英冠、沙特联、葡超、荷甲、土超、阿甲、日职 J1/J2、韩 K1/K2、德乙/法乙/西乙。<br>
   数据：盘口来自 OddsPapi（每家庄家的完整变盘记录，Pinnacle 为参考），球队近况来自 ESPN 赛果。每 6 小时自动更新。<br>
@@ -164,7 +186,7 @@ function cardHTML(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];
   const bk=Object.keys(fx.books);
   const flags=fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("");
-  return `<div class="card ${fx.score>=3?"hot":""}">
+  return `<div class="card ${fx.score>=3?"hot":""}" data-id="${esc(fx.id)}">
    <div class="meta"><span class="lg">${esc(fx.country?fx.country+" · ":"")}${esc(fx.league)}</span><span>${fmtT(fx.start)}</span></div>
    <div class="teams"><div class="tm">${esc(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${esc(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
    ${ref?mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"]):`<div class="sub">暂无盘口数据</div>`}
@@ -191,6 +213,7 @@ function init(d){
   const lgs={};d.fixtures.forEach(f=>lgs[f.league]=(lgs[f.league]||0)+1);
   $("#lg").innerHTML=`<option value="">全部联赛（${d.fixtures.length}）</option>`+Object.entries(lgs).sort((a,b)=>((ORDER[a[0]]??99)-(ORDER[b[0]]??99))||b[1]-a[1]).map(([l,n])=>`<option value="${esc(l)}">${esc(l)}（${n}）</option>`).join("");
   render();
+  if(location.hash.length>1) openDlg(decodeURIComponent(location.hash.slice(1)));
 }
 function histTable(g,kind){
   const keys=Object.keys(g||{}).map(Number).sort((a,b)=>a-b);
@@ -210,6 +233,67 @@ function renderHist(h){
   <h3>大小球（盘口线升降）</h3>${histTable(h.ou,"ou")}
   <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
 }
+let IDEAS=null;
+const ahN=x=>x==null?"—":ahLine(x);
+function bigSpark(series,color){return series&&series.length>1?`<div class="spk">${spark(series,color).replace('class="spark"','class="spark" preserveAspectRatio="none"')}</div>`:""}
+function briefRows(list,kind){
+  if(!list||!list.length) return "";
+  return `<div class="scroll"><table class="ht"><tr><th>日期</th><th>主</th><th>比分</th><th>客</th><th>初赔 主/平/客</th><th>亚盘 初→终</th><th>大小 初→终</th></tr>${list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td>${esc(r.home)}</td><td><b>${r.score}</b></td><td>${esc(r.away)}</td><td>${r.odds?r.odds.join(" / "):"—"}</td><td>${r.ah?ahN(r.ah[0])+" → "+ahN(r.ah[1]):"—"}</td><td>${r.ou?r.ou[0]+" → "+r.ou[1]:"—"}</td></tr>`).join("")}</table></div>`;
+}
+const P=x=>x==null?"—":(x*100).toFixed(0)+"%", R=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
+function detailHTML(fx){
+  const d=fx.detail||{},ref=fx.books.pinnacle||Object.values(fx.books)[0];
+  let h=`<button class="x" onclick="closeDlg()">关闭</button><div class="sub">${esc(fx.country?fx.country+" · ":"")}${esc(fx.league)} · ${fmtT(fx.start)}</div><h2>${esc(fx.home)} vs ${esc(fx.away)}</h2>`;
+  if(fx.flags.length) h+=`<div class="flags" style="margin-top:10px">${fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("")}</div>`;
+  h+=`<h3>盘口走势（Pinnacle，开盘 → 现在）</h3>`;
+  if(ref){h+=[mkOU(ref.ou),mkAH(ref.ah),mk12(ref["1x2"])].map(x=>x.replace('<div class="mk">','<div class="mk big">').replace(/<svg class="spark"[\s\S]*?<\/svg>/,"")).join("");
+    const sp=[["ou","预期进球","var(--up)"],["ah","主队净胜球预期","var(--home)"],["1x2","主胜概率","var(--good)"]].filter(([k])=>ref[k]&&ref[k].series&&ref[k].series.length>1);
+    h+=sp.map(([k,l,c])=>`<div class="sub" style="margin-top:8px">${l}</div>${bigSpark(ref[k].series,c)}`).join("");
+  } else h+=`<div class="hint">暂无盘口数据</div>`;
+  // judgement
+  h+=`<h3>判断（市场 vs 历史同类比赛）</h3><div class="hint">样本越多，历史的权重越大：估计 =（40×市场 + 样本数×历史）÷（40 + 样本数）。同联赛样本少于 15 场时不给判断。这是统计倾向，不是预测。</div>`;
+  if(d.judge&&d.judge.length){h+=`<table class="ht judge"><tr><th>项目</th><th>市场概率</th><th>历史同类</th><th>样本</th><th>综合估计</th><th>差值</th></tr>${d.judge.map(j=>`<tr><td>${esc(j.what)}<span class="sub">（${j.src}）</span></td><td>${P(j.market)}</td><td>${P(j.hist)}</td><td>${j.n}</td><td><b>${P(j.est)}</b></td><td>${j.edge==null?"—":`<span class="${j.edge>0?"pos":"neg"}">${(j.edge*100).toFixed(1)}%</span>`}</td></tr>`).join("")}</table>`}
+  else h+=`<div class="hint">同联赛历史样本还不够（目前 ${d.league_n||0} 场），积累几天后这里会出现判断。</div>`;
+  // same move
+  const sm=d.same_move||{};
+  h+=`<h3>历史同升降（同联赛、盘口从开盘到收盘变化相同）</h3>`;
+  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}</div>${briefRows(a.list)}`}
+  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}</div>${briefRows(a.list)}`}
+  if(!sm.ah&&!sm.ou) h+=`<div class="hint">暂无盘口数据</div>`;
+  // same odds
+  const so=d.same_odds;
+  h+=`<h3>历史同赔（同联赛、Pinnacle 初赔主/平/客相近）</h3>`;
+  if(so&&so.n){const [w,dd,l]=so.wdl;h+=`<div class="kv"><span>本场初赔 <b>${so.odds.join(" / ")}</b></span><span>样本 <b>${so.n}</b> 场</span><span>主胜 <b>${P(w/so.n)}</b></span><span>平 <b>${P(dd/so.n)}</b></span><span>客胜 <b>${P(l/so.n)}</b></span><span>平均进球 ${so.avg_goals}</span><span>大2.5 ${P(so.o25)}</span></div>${briefRows(so.list)}`}
+  else h+=`<div class="hint">${so?`本场初赔 ${so.odds.join(" / ")}，`:""}同联赛还没有相近初赔的历史比赛。</div>`;
+  // h2h
+  const hh=d.h2h;
+  h+=`<h3>历史交手（近一年）</h3>`;
+  if(hh&&hh.n){h+=`<div class="kv"><span>${hh.n} 场</span><span>${esc(fx.home)} 胜 <b>${hh.home_w}</b></span><span>平 <b>${hh.draw}</b></span><span>${esc(fx.away)} 胜 <b>${hh.away_w}</b></span><span>场均进球 ${hh.avg_goals}</span><span>大2.5 ${P(hh.o25)}</span></div><div class="scroll"><table class="ht"><tr><th>日期</th><th>主</th><th>比分</th><th>客</th></tr>${hh.list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td>${esc(r.home)}</td><td><b>${r.score}</b></td><td>${esc(r.away)}</td></tr>`).join("")}</table></div>`}
+  else h+=`<div class="hint">近一年没有交手记录（或 ESPN 没有这两队的数据）。</div>`;
+  // team form
+  h+=`<h3>球队近况</h3>`+statsBlock(fx).replace("<details>","<details open>");
+  // ideas
+  const mine=(IDEAS&&IDEAS.ideas||[]).filter(i=>i.match===fx.id);
+  const url=DATA.repo?`https://github.com/${DATA.repo}/issues/new?template=idea.yml&title=${encodeURIComponent("[思路] "+fx.home+" vs "+fx.away)}&match=${encodeURIComponent(fx.id)}&game=${encodeURIComponent(fx.home+" vs "+fx.away+"（"+fmtT(fx.start)+"）")}`:"";
+  h+=`<h3>思路</h3><div class="hint">开赛前提交的思路，赛后自动判对错并计入"思路战绩"，按理由分类统计哪类思路长期靠谱。需要登录 GitHub。</div>${url?`<a class="btn" href="${url}" target="_blank" rel="noopener">提交思路</a>`:""}`;
+  h+=mine.map(i=>`<div class="idea"><span class="st">${i.status==="settled"?(i.ret>0?"✅ ":"❌ ")+esc(i.word)+" "+i.score:i.status==="late"?"开赛后提交":"等待结果"}</span><b>${esc(i.market)} ${esc(i.pick)} ${i.line??""}</b> @ ${i.odds??"—"} <span class="sub">${(i.tags||[]).join("、")}</span><div>${esc(i.why||"")}</div><a class="sub" href="${i.url}" target="_blank" rel="noopener">查看</a></div>`).join("");
+  return h;
+}
+function openDlg(id){const fx=DATA.fixtures.find(f=>f.id===id);if(!fx)return;$("#dlgBox").innerHTML=detailHTML(fx);$("#dlg").classList.add("on");document.body.style.overflow="hidden";history.replaceState(null,"","#"+encodeURIComponent(id))}
+function closeDlg(){$("#dlg").classList.remove("on");document.body.style.overflow="";history.replaceState(null,"",location.pathname)}
+$("#dlg").onclick=e=>{if(e.target.id==="dlg")closeDlg()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDlg()});
+$("#list").addEventListener("click",e=>{if(e.target.closest("details,a"))return;const c=e.target.closest(".card");if(c)openDlg(c.dataset.id)});
+function renderIdeas(x){
+  IDEAS=x;
+  const rec=r=>r&&r.n?`${r.n} 次 · 赢 ${r.win} · 回报 ${R(r.roi)}`:"还没有已结算的思路";
+  $("#ideasPanel").innerHTML=`<h2>思路战绩</h2><p>只统计开赛前提交、已出结果的思路。回报按提交时的赔率、亚洲盘结算，每次 1 元。样本少时看个大概，几十次以上才有参考意义。</p>
+  <div class="kv"><span>全部：<b>${rec(x&&x.all)}</b></span></div>
+  <h3>按玩法</h3><div class="kv">${Object.entries((x&&x.market)||{}).map(([k,v])=>`<span>${k}：${rec(v)}</span>`).join("")}</div>
+  <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}`;
+}
+$("#ideasTab").onclick=e=>{const on=$("#ideasPanel").hidden;$("#ideasPanel").hidden=!on;e.target.classList.toggle("on",on)};
+fetch("ideas.json?"+Date.now()).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
 $("#histTab").onclick=e=>{const on=$("#hist").hidden;$("#hist").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("history.json?"+Date.now()).then(r=>r.json()).then(renderHist).catch(()=>renderHist(null));
 $("#q").oninput=render;$("#lg").onchange=render;

@@ -1,0 +1,58 @@
+name: 比赛思路
+description: 对一场比赛提交判断和思路，比赛结束后自动判对错、计入战绩
+title: "[思路] "
+labels: ["idea"]
+body:
+  - type: input
+    id: match
+    attributes:
+      label: 比赛ID
+      description: 从看板点"提交思路"会自动填好，不用改
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: 比赛
+  - type: dropdown
+    id: market
+    attributes:
+      label: 玩法
+      options: [大小球, 亚盘, 胜平负]
+    validations:
+      required: true
+  - type: dropdown
+    id: pick
+    attributes:
+      label: 选择
+      options: [大, 小, 主队, 客队, 主胜, 平局, 客胜]
+    validations:
+      required: true
+  - type: input
+    id: line
+    attributes:
+      label: 盘口
+      description: 大小球填线（如 2.5），亚盘填主队让球（主让半球填 -0.5，主受让平半填 0.25）；不填就用提交时的盘口
+  - type: input
+    id: odds
+    attributes:
+      label: 赔率
+      description: 可不填，不填就用提交时 Pinnacle 的赔率
+  - type: checkboxes
+    id: tags
+    attributes:
+      label: 理由（可多选）
+      options:
+        - label: 盘口升降
+        - label: 历史同赔
+        - label: 历史交手
+        - label: 基本面/近况
+        - label: 伤停/首发
+        - label: 战意/赛程
+        - label: 诱盘判断
+        - label: 直觉
+  - type: textarea
+    id: why
+    attributes:
+      label: 思路
+      description: 写下你的理由。赛后会自动回复对错，好的错的都留着复盘

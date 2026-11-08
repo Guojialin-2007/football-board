@@ -16,7 +16,9 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
+from . import detail as D
 from . import history as H
+from . import ideas as I
 from . import leagues as LG
 from . import polyleagues as P
 from . import odds as O
@@ -175,6 +177,36 @@ def run(inspect=False, log=print):
         if (i + 1) % 50 == 0:
             log(f"[board]   {i + 1}/{min(max_fx, len(fxs))} fixtures, {(time.time() - t0) / 60:.0f} min")
     matched = sum(1 for c in cards if (c["stats"]["home"]["all"] or {}).get("n"))
+    # ---- detail: same-league history (同赔 / 同升降), head-to-head, judgement
+    rows = H.load_rows(DATA)
+    by_league = {}
+    for r in rows:
+        lg = (tmap or {}).get(str(r.get("tid") or ""))
+        if lg:
+            by_league.setdefault(lg, []).append(r)
+    for c in cards:
+        c["detail"] = D.build(c, teams, by_league.get(c["league"], []))
+    # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known
+    seen_p = os.path.join(DATA, "seen.json")
+    seen = json.load(open(seen_p)) if os.path.exists(seen_p) else {}
+    for c in cards:
+        seen[c["id"]] = {"id": c["id"], "start": c["start"], "home": c["home"], "away": c["away"], "league": c["league"]}
+    seen = {k: v for k, v in seen.items() if v["start"] > time.time() - 14 * 86400}
+    json.dump(seen, open(seen_p, "w"), ensure_ascii=False)
+    by_id = {r["id"]: r for r in rows}
+
+    def result_of(idea):
+        r = by_id.get(idea["match"])
+        if r:
+            return r["hs"], r["as"]
+        from datetime import datetime as _dt, timezone as _tz
+        f = {"participant1Name": idea.get("home"), "participant2Name": idea.get("away"),
+             "startTime": _dt.fromtimestamp(idea["start"], _tz.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")}
+        return H.espn_score(teams, f)
+    try:
+        I.run({**seen, **{c["id"]: c for c in cards}}, result_of, DATA, SITE, log=log)
+    except Exception as e:                 # noqa: BLE001  never lose the board because of the ideas job
+        log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
     try:                                   # spare time: finished matches for the "what happened before" tables
         H.backfill(api, m["sid"], m["markets"], DATA, teams, hist_budget, log=log,
                    allowed=set(tmap) if tmap else None)
@@ -183,6 +215,7 @@ def run(inspect=False, log=print):
     agg = H.aggregate(DATA)
     json.dump(agg, open(os.path.join(SITE, "history.json"), "w"), ensure_ascii=False)
     out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards,
+           "repo": os.environ.get("GITHUB_REPOSITORY", ""),
            "leagues": [{"league": x["league"], "volume": x["volume"]} for x in (top or [])],
            "summary": {"fixtures": len(cards), "with_odds": len(cards) - no_odds, "with_stats": matched,
                        "flags": sum(1 for c in cards if c["flags"])}}

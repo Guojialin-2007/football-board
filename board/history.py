@@ -113,7 +113,8 @@ def row_from(f, comp, result):
     k = ts(f.get("startTime"))
     op, cl = _open_state(bd, k), _close_state(bd, k)
     r = {"id": str(f.get("fixtureId")), "t": k, "home": f.get("participant1Name"), "away": f.get("participant2Name"),
-         "lg": f.get("tournamentName") or str(f.get("tournamentId") or ""), "hs": result[0], "as": result[1]}
+         "lg": f.get("tournamentName") or str(f.get("tournamentId") or ""), "tid": str(f.get("tournamentId") or ""),
+         "hs": result[0], "as": result[1]}
     if "ou" in op and "ou" in cl:
         r["ou"] = {"ol": op["ou"]["line"], "cl": cl["ou"]["line"], "olam": op["ou"].get("lam"), "clam": cl["ou"].get("lam"),
                    "codds": cl["ou"]["odds"], "oodds": op["ou"]["odds"]}
@@ -121,7 +122,7 @@ def row_from(f, comp, result):
         r["ah"] = {"ol": op["ah"]["line"], "cl": cl["ah"]["line"], "osup": op["ah"]["sup"], "csup": cl["ah"]["sup"],
                    "codds": cl["ah"]["odds"], "oodds": op["ah"]["odds"]}
     if "1x2" in op and "1x2" in cl:
-        r["x2"] = {"op": op["1x2"]["p"], "cp": cl["1x2"]["p"], "codds": cl["1x2"]["odds"]}
+        r["x2"] = {"op": op["1x2"]["p"], "cp": cl["1x2"]["p"], "codds": cl["1x2"]["odds"], "oodds": op["1x2"]["odds"]}
     return r if ("ou" in r or "ah" in r) else None
 
 

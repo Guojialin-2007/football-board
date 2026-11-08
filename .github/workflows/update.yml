@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
   pages: write
   id-token: write
 
@@ -37,6 +38,7 @@ jobs:
         continue-on-error: true
         env:
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOURS: ${{ vars.HOURS }}
           MAX_FIXTURES: ${{ vars.MAX_FIXTURES }}
           BOOKS: ${{ vars.BOOKS }}

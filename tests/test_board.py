@@ -196,6 +196,41 @@ def test_polymarket_leagues():
     assert tm == {"17": "English Premier League", "8": "La Liga"}
 
 
+def test_ideas():
+    from board import ideas as I
+    body = ("### 比赛ID\n\nid1\n\n### 比赛\n\nA vs B\n\n### 玩法\n\n大小球\n\n### 选择\n\n大\n\n### 盘口\n\n2.75\n\n"
+            "### 赔率\n\n_No response_\n\n### 理由（可多选）\n\n- [X] 盘口升降\n- [ ] 历史同赔\n- [x] 直觉\n\n### 思路\n\n升档跟进")
+    f = I.parse(body)
+    assert f["match"] == "id1" and f["market"] == "大小球" and f["line"] == 2.75 and f["odds"] is None
+    assert f["tags"] == ["盘口升降", "直觉"] and f["why"] == "升档跟进"
+    assert I.settle(dict(f, odds=2.0), 2, 1)["word"] == "赢半"            # 3 goals on over 2.75
+    assert I.settle({"market": "亚盘", "pick": "客队", "line": -0.5, "odds": 1.9}, 1, 1)["word"] == "赢"
+
+    class FakeGH:
+        ok = True
+        replies = []
+
+        def ensure_label(self):
+            pass
+
+        def issues(self):
+            return [{"number": 7, "body": body, "html_url": "u", "user": {"login": "me"}, "created_at": iso(NOW - timedelta(days=2))},
+                    {"number": 8, "body": body.replace("2.75", "3.5"), "html_url": "u", "user": {"login": "me"},
+                     "created_at": iso(NOW - timedelta(hours=1))}]
+
+        def reply_and_close(self, num, text, label):
+            self.replies.append((num, label))
+
+    with tempfile.TemporaryDirectory() as d:
+        cards = {"id1": {"id": "id1", "start": int((NOW - timedelta(days=1)).timestamp()), "home": "A", "away": "B",
+                         "league": "英超", "books": {}}}
+        g = FakeGH()
+        out = I.run(cards, lambda idea: (2, 1), d, d, gh=g, log=lambda *a: None)
+        assert out["all"]["n"] == 1 and out["all"]["win"] == 1                 # #8 came after kickoff: not counted
+        assert dict(g.replies) == {7: "✅正确", 8: "❌错误"}
+        assert out["tags"]["盘口升降"]["n"] == 1
+
+
 def test_lambda_inverse():
     for lam in (1.8, 2.6, 3.4):
         assert abs(O.lam_from(2.5, O.pois_over(2.5, lam)) - lam) < 0.01
