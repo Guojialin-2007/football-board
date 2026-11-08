@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from . import history as H
+from . import polyleagues as P
 from . import odds as O
 from . import signals as S
 from . import stats as T
@@ -95,7 +96,7 @@ def card(f, comp, teams, tours, now, hist=None):
     start = ts(f.get("startTime"))
     tid = str(f.get("tournamentId") or "")
     tinfo = tours.get(tid, {})
-    lg = f.get("tournamentName") or tinfo.get("name") or "?"
+    lg = f.get("_pm") or f.get("tournamentName") or tinfo.get("name") or "?"
     country = f.get("categoryName") or tinfo.get("country") or ""
     home, away = f.get("participant1Name") or "?", f.get("participant2Name") or "?"
     fx = {"id": str(f.get("fixtureId")), "start": start, "league": lg, "country": country, "home": home, "away": away,
@@ -125,7 +126,7 @@ def run(inspect=False, log=print):
     t0 = time.time()
     os.makedirs(SITE, exist_ok=True)
     env = lambda k, d: os.environ.get(k) or d          # empty repository variables fall back to the default
-    hours = float(env("HOURS", 36))
+    hours = float(env("HOURS", 48))
     max_fx = int(env("MAX_FIXTURES", 700))
     budget = float(env("BUDGET_MIN", 110)) * 60
     hist_budget = float(env("HIST_MIN", 60)) * 60
@@ -136,6 +137,15 @@ def run(inspect=False, log=print):
     teams = T.Teams(T.load_results(DATA, days=300))
     hist = H.aggregate(DATA)
     fxs = upcoming(api, m["sid"], hours)
+    top, tmap = (None, None)
+    if (env("ONLY_TOP", "1")) != "0":
+        top, tmap = P.load(DATA, fxs, log=log)
+    if tmap:
+        kept = [f for f in fxs if str(f.get("tournamentId")) in tmap]
+        for f in kept:
+            f["_pm"] = tmap[str(f.get("tournamentId"))]
+        log(f"[board] Polymarket top {len(top)} leagues: kept {len(kept)} of {len(fxs)} fixtures")
+        fxs = kept
     log(f"[board] {len(fxs)} fixtures in the next {hours:.0f} h; fetching odds for up to {min(max_fx, len(fxs))}")
     if inspect and fxs:
         log("[inspect] first fixture: " + json.dumps(fxs[0], ensure_ascii=False)[:800])
@@ -159,12 +169,14 @@ def run(inspect=False, log=print):
             log(f"[board]   {i + 1}/{min(max_fx, len(fxs))} fixtures, {(time.time() - t0) / 60:.0f} min")
     matched = sum(1 for c in cards if (c["stats"]["home"]["all"] or {}).get("n"))
     try:                                   # spare time: finished matches for the "what happened before" tables
-        H.backfill(api, m["sid"], m["markets"], DATA, teams, hist_budget, log=log)
+        H.backfill(api, m["sid"], m["markets"], DATA, teams, hist_budget, log=log,
+                   allowed=set(tmap) if tmap else None)
     except Exception as e:                 # noqa: BLE001  never lose the board because of the history job
         log(f"[history] backfill stopped: {type(e).__name__}: {str(e)[:160]}")
     agg = H.aggregate(DATA)
     json.dump(agg, open(os.path.join(SITE, "history.json"), "w"), ensure_ascii=False)
     out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards,
+           "leagues": [{"league": x["league"], "volume": x["volume"]} for x in (top or [])],
            "summary": {"fixtures": len(cards), "with_odds": len(cards) - no_odds, "with_stats": matched,
                        "flags": sum(1 for c in cards if c["flags"])}}
     json.dump(out, open(os.path.join(SITE, "data.json"), "w"), ensure_ascii=False, separators=(",", ":"))

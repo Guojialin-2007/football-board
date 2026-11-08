@@ -102,6 +102,7 @@ details[open] summary::before{content:"▾ "}
 </div></header>
 <main class="wrap"><div id="hist" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">
+  只显示 Polymarket 足球交易量最大的 20 个联赛（按最近 60 天成交额，每周更新）。<br>
   数据：盘口来自 OddsPapi（每家庄家的完整变盘记录，Pinnacle 为参考），球队近况来自 ESPN 赛果。每 6 小时自动更新。<br>
   预期进球：用大小球 .5 盘口和去水后的概率按泊松分布反推，线和赔率的变化合成一个数。主队净胜球预期：用亚盘主盘口加赔率换算。<br>
   盘口变化反映的是市场的判断，看到它变时，好价格往往已经没了。这里只提供信息，不是投注建议。
@@ -185,6 +186,7 @@ function init(d){
   DATA=d;
   $("#gen").textContent="更新于 "+fmtT(d.generated);
   const s=d.summary;
+  if(d.leagues&&d.leagues.length) $("#gen").textContent+=` · Polymarket 交易量前 ${d.leagues.length} 的联赛`;
   $("#stats").innerHTML=`<span><b>${s.fixtures}</b>场比赛</span><span><b>${s.with_odds}</b>有盘口</span><span><b>${s.flags}</b>有信号</span>`;
   const lgs={};d.fixtures.forEach(f=>lgs[f.league]=(lgs[f.league]||0)+1);
   $("#lg").innerHTML=`<option value="">全部联赛（${d.fixtures.length}）</option>`+Object.entries(lgs).sort((a,b)=>b[1]-a[1]).map(([l,n])=>`<option value="${esc(l)}">${esc(l)}（${n}）</option>`).join("");

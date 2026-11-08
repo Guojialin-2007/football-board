@@ -56,6 +56,10 @@ class R:
     def json(self):
         return self.js
 
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(self.status_code)
+
 
 class FakeSession:
     def __init__(self):
@@ -116,6 +120,7 @@ def test_board_end_to_end():
         B.DATA, B.SITE = os.path.join(d, "data"), os.path.join(d, "site")
         fs = FakeSession()
         os.environ["ODDSPAPI_KEY"] = "test-key"
+        os.environ["ONLY_TOP"] = "0"
         orig_papi, orig_fetch = B.Papi, T.fetch_results
         B.Papi = lambda: orig_papi(session=fs, sleep=lambda s: None)
         B.T.fetch_results = lambda data_dir, days=40, log=print: orig_fetch(data_dir, days=40, session=fs, sleep=lambda s: None, log=log)
@@ -159,6 +164,36 @@ def test_asian_settlement():
     assert H.settle_away(1, -0.75, 2.0) == -0.5
     assert H.settle_home(0, 0, 1.9) == 0                        # draw on level ball: push
     assert H.ah_name(-0.5) == "主让半球" and H.ah_name(0.25) == "主受让平半" and H.ah_name(0) == "平手"
+
+
+def test_polymarket_leagues():
+    from board import polyleagues as P
+
+    class G:
+        headers = {}
+
+        def get(self, url, params=None, timeout=None):
+            if url.endswith("/tags/slug/soccer"):
+                return R({"id": 100350})
+            if params.get("closed") == "false" or params.get("offset", 0) > 0:
+                return R([])
+            evs = []
+            for i, (a, b) in enumerate((("Arsenal", "Chelsea"), ("Liverpool", "Everton"), ("Fulham", "Brentford"))):
+                evs.append({"id": f"e{i}", "title": f"{a} vs. {b}", "volume": 1e6, "endDate": iso(NOW - timedelta(days=3)),
+                            "series": [{"title": "English Premier League"}]})
+            for i, (a, b) in enumerate((("Real Madrid", "Sevilla"), ("Barcelona", "Getafe"))):
+                evs.append({"id": f"s{i}", "title": f"{a} vs. {b} - More Markets", "volume": 2e5,
+                            "endDate": iso(NOW - timedelta(days=3)), "tags": [{"label": "Soccer"}, {"label": "La Liga"}]})
+            return R(evs)
+
+    top = P.rank(session=G(), log=lambda *a: None)
+    assert [x["league"] for x in top] == ["English Premier League", "La Liga"] and top[0]["volume"] == 3000000
+    fx = [{"tournamentId": 17, "participant1Name": "Arsenal FC", "participant2Name": "Chelsea FC"},
+          {"tournamentId": 17, "participant1Name": "Everton", "participant2Name": "Fulham"},
+          {"tournamentId": 8, "participant1Name": "Real Madrid CF", "participant2Name": "Getafe CF"},
+          {"tournamentId": 99, "participant1Name": "Boca Juniors", "participant2Name": "River Plate"}]
+    tm = P.assign(top, fx, {}, log=lambda *a: None)
+    assert tm == {"17": "English Premier League", "8": "La Liga"}
 
 
 def test_lambda_inverse():
