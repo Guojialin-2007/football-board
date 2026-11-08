@@ -16,7 +16,7 @@ import re
 
 PARTIAL = re.compile(r"half|1st|2nd|first|second|corner|card|booking|team total|player|minute|period|extra|"
                      r"penalt|to qualify|clean|both teams|btts|exact|correct|odd|even|interval|race|margin|"
-                     r"european|3[- ]?way handicap|draw no bet|double chance", re.I)
+                     r"european|3[- ]?way handicap|draw no bet|double chance|team ?[12]\b|team ?total|\b\d+ ?up\b", re.I)
 FULL = ("result", "fulltime", "full time", "ft", "regular", "fulltime result", "")
 
 
@@ -46,7 +46,7 @@ def classify(markets, sid):
         nm = str(m.get("marketName", ""))
         typ = str(m.get("marketType", "")).lower()
         per = str(m.get("period", "")).lower()
-        if per not in FULL or PARTIAL.search(nm):
+        if per not in FULL or PARTIAL.search(nm) or "team" in typ or re.search(r"\dup", typ):
             continue
         outs = {str(o.get("outcomeId")): _label(o.get("outcomeName")) for o in m.get("outcomes") or []}
         labels = set(outs.values())

@@ -32,11 +32,14 @@ DATA = os.path.join(ROOT, "data")
 SITE = os.path.join(ROOT, "site")
 
 
+META_V = 2          # 2: team totals and "2Up" results no longer mixed into O/U and 1X2
+
+
 def meta(api, refresh_days=7, log=print):
     """Soccer sport id, recognised markets and tournament names - cached because they use the monthly allowance."""
     path = os.path.join(DATA, "meta.json")
     m = json.load(open(path)) if os.path.exists(path) else {}
-    if m and time.time() - m.get("at", 0) < refresh_days * 86400 and m.get("markets"):
+    if m and m.get("v") == META_V and time.time() - m.get("at", 0) < refresh_days * 86400 and m.get("markets"):
         return m
     sports = api.get("/v4/sports")
     sp = next((s for s in sports if name(s).strip().lower() in ("soccer", "football")), None)
@@ -60,7 +63,7 @@ def meta(api, refresh_days=7, log=print):
         for x in raw:
             log(f"[meta]   market {x.get('marketId')}: {x.get('marketName')} | {x.get('marketType')} | "
                 f"{x.get('period')} | h={x.get('handicap')} | {[o.get('outcomeName') for o in x.get('outcomes') or []]}")
-    m = {"at": time.time(), "sid": sid, "markets": cls, "tours": tours}
+    m = {"v": META_V, "at": time.time(), "sid": sid, "markets": cls, "tours": tours}
     os.makedirs(DATA, exist_ok=True)
     json.dump(m, open(path, "w"))
     return m
@@ -230,7 +233,7 @@ def run(inspect=False, log=print):
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
     t_rt = time.time()
     try:                                   # older history rows: add when the line last moved
-        H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 15)) * 60, log=log)
+        H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 30)) * 60, log=log)
     except Exception as e:                 # noqa: BLE001
         log(f"[history] retime stopped: {type(e).__name__}: {str(e)[:160]}")
     hist_budget = max(0.0, hist_budget - (time.time() - t_rt))

@@ -114,7 +114,7 @@ def row_from(f, comp, result):
     op, cl = _open_state(bd, k), _close_state(bd, k)
     r = {"id": str(f.get("fixtureId")), "t": k, "home": f.get("participant1Name"), "away": f.get("participant2Name"),
          "lg": f.get("tournamentName") or str(f.get("tournamentId") or ""), "tid": str(f.get("tournamentId") or ""),
-         "hs": result[0], "as": result[1]}
+         "hs": result[0], "as": result[1], "v": ROW_V}
     def lt(kind):
         t = O.last_move(bd, kind, k - 60)
         return round((k - t) / 3600, 2) if t else None
@@ -226,35 +226,50 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
     return added
 
 
+ROW_V = 2      # 2: built from full-time markets only (v1 rows mixed team totals into O/U and "2Up" into 1X2)
+
+
 def retime(api, cls, data_dir, budget_s, log=print):
-    """Older rows were saved without the time of the last line move ('lt'); fetch their odds again (free endpoint)
-    and add it, a few hundred per run, newest first."""
+    """Rebuild rows saved by older versions (v1: wrong O/U and 1X2 markets, no line-move times) from a fresh
+    copy of their odds (free endpoint), newest first, as many as the budget allows."""
     p = os.path.join(data_dir, "history", "rows.jsonl")
     if not os.path.exists(p) or budget_s <= 0:
         return 0
-    rows = [json.loads(x) for x in open(p, encoding="utf-8") if x.strip()]
-    todo = sorted([r for r in rows if any(m in r and "lt" not in r[m] for m in ("ah", "ou"))], key=lambda r: -r["t"])
-    t0, done = time.time(), 0
+    rows, seen = [], set()
+    for x in open(p, encoding="utf-8"):
+        if x.strip():
+            r = json.loads(x)
+            if r["id"] not in seen:
+                seen.add(r["id"])
+                rows.append(r)
+    todo = sorted([r for r in rows if r.get("v") != ROW_V], key=lambda r: -r["t"])
+    t0, done, dropped = time.time(), 0, set()
+    new = {}
     for r in todo:
         if time.time() - t0 > budget_s:
             break
+        f = {"fixtureId": r["id"], "startTime": datetime.fromtimestamp(r["t"], timezone.utc).isoformat(),
+             "participant1Name": r["home"], "participant2Name": r["away"], "tournamentName": r.get("lg"),
+             "tournamentId": r.get("tid")}
         try:
             js = api.get("/v4/historical-odds", fixtureId=r["id"], bookmakers="pinnacle")
-            bd = O.compact(js, cls, ["pinnacle"]).get("pinnacle") or {}
+            nr = row_from(f, O.compact(js, cls, ["pinnacle"]), (r["hs"], r["as"]))
         except RuntimeError:
-            bd = {}
-        for m in ("ah", "ou"):
-            if m in r:
-                t = O.last_move(bd, m, r["t"] - 60) if bd else None
-                r[m]["lt"] = round((r["t"] - t) / 3600, 2) if t else None
+            nr = None
+        if nr:
+            new[r["id"]] = nr
+        else:
+            dropped.add(r["id"])
         done += 1
     if done:
         tmp = p + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             for r in rows:
-                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+                if r["id"] in dropped:
+                    continue
+                fh.write(json.dumps(new.get(r["id"], r), ensure_ascii=False) + "\n")
         os.replace(tmp, p)
-    log(f"[history] line-move times added to {done} older matches; {len(todo) - done} left")
+    log(f"[history] rebuilt {done} older matches ({len(dropped)} dropped); {len(todo) - done} still to rebuild")
     return done
 
 
@@ -266,7 +281,7 @@ def load_rows(data_dir):
     for x in open(p, encoding="utf-8"):
         if x.strip():
             r = json.loads(x)
-            if r["id"] not in seen:
+            if r["id"] not in seen and r.get("v") == ROW_V:
                 seen.add(r["id"])
                 out.append(r)
     return out
