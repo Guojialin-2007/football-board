@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>赛前盘口看板</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121821; --panel2:#18202b; --line:#243041; --text:#e6edf3; --muted:#8b98a8; --faint:#5d6b7c;
+  --up:#ff7a59; --down:#3fb7ff; --home:#f5b942; --away:#9b8cff; --good:#38d39f; --warn:#ffcc4d;
+  --radius:14px;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f4f6f9; --panel:#ffffff; --panel2:#f0f3f7; --line:#dde3ea; --text:#17202b; --muted:#5b6878; --faint:#8a96a5;
+    --up:#e2552f; --down:#1688d6; --home:#c98a0c; --away:#6b58e0; --good:#0f9d6e; --warn:#b98400;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+.top{display:flex;align-items:center;gap:14px;padding:14px 0 10px;flex-wrap:wrap}
+h1{font-size:18px;margin:0;letter-spacing:.5px}
+h1 span{color:var(--muted);font-weight:400;font-size:13px;margin-left:8px}
+.stats{display:flex;gap:16px;margin-left:auto;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.stats b{color:var(--text);font-size:15px;margin-right:3px}
+.bar{display:flex;gap:8px;padding-bottom:12px;flex-wrap:wrap}
+.bar input,.bar select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:7px 10px;font:inherit}
+.bar input{flex:1;min-width:160px}
+.chip{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 12px;cursor:pointer;user-select:none;font-size:13px}
+.chip.on{color:var(--text);border-color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,var(--panel))}
+main{padding:16px 0 60px}
+.day{color:var(--muted);font-size:12px;margin:18px 2px 8px;letter-spacing:1px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+.card{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px}
+.card.hot{border-color:color-mix(in srgb,var(--warn) 55%,var(--line))}
+.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;gap:8px}
+.meta .lg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.tm{font-weight:600;font-size:15px}
+.tm.a{text-align:right}
+.vs{color:var(--faint);font-size:12px}
+.form{display:flex;gap:3px;margin-top:3px}
+.tm.a .form{justify-content:flex-end}
+.f{width:16px;height:16px;border-radius:4px;font-size:10px;display:grid;place-items:center;font-weight:700;color:#0b0f14}
+.f.W{background:var(--good)}.f.D{background:var(--faint)}.f.L{background:var(--up)}
+.sub{color:var(--muted);font-size:11px;font-weight:400}
+.mk{background:var(--panel2);border-radius:10px;padding:9px 10px;display:grid;grid-template-columns:52px minmax(0,1fr) 88px;gap:8px;align-items:center}
+.mk .k{color:var(--muted);font-size:12px}
+.mk .v{font-variant-numeric:tabular-nums;display:flex;flex-direction:column;gap:1px}
+.row{display:flex;gap:6px;align-items:baseline;white-space:nowrap}
+.row .lbl{color:var(--muted);font-size:12px;min-width:52px}
+.x3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.x3 div{white-space:nowrap}
+.x3 .lbl{color:var(--muted);font-size:12px;margin-right:2px}
+.arrow{color:var(--faint);margin:0 4px}
+.up{color:var(--up)}.down{color:var(--down)}
+.spark{width:88px;height:28px}
+.flags{display:flex;flex-direction:column;gap:5px}
+.flag{overflow-wrap:anywhere;font-size:12.5px;padding:6px 9px;border-radius:8px;background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:3px solid var(--warn)}
+.flag.l1{border-left-color:var(--faint);background:transparent;color:var(--muted)}
+.flag.l3{background:color-mix(in srgb,var(--up) 14%,transparent);border-left-color:var(--up)}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.tbl td,.tbl th{padding:3px 4px;text-align:center}
+.tbl th{color:var(--faint);font-weight:400}
+.tbl td:first-child,.tbl th:first-child{text-align:left;color:var(--muted)}
+details summary{cursor:pointer;color:var(--muted);font-size:12px;list-style:none}
+details summary::before{content:"▸ "}
+details[open] summary::before{content:"▾ "}
+.last{font-size:12px;color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.last b{color:var(--text)}
+.empty{color:var(--muted);text-align:center;padding:60px 0}
+.note{color:var(--faint);font-size:12px;margin-top:30px;line-height:1.7}
+.books{font-size:11px;color:var(--faint)}
+@media (max-width:420px){.grid{grid-template-columns:1fr}.mk{grid-template-columns:46px minmax(0,1fr) 64px}.spark{width:64px}.row .lbl{min-width:44px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="top">
+    <h1>赛前盘口看板<span id="gen"></span></h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="bar">
+    <input id="q" placeholder="搜索球队或联赛">
+    <select id="lg"><option value="">全部联赛</option></select>
+    <span class="chip" id="onlyFlags">只看有信号</span>
+    <span class="chip" id="sortScore">按信号强度排序</span>
+  </div>
+</div></header>
+<main class="wrap"><div id="list"><div class="empty">加载中…</div></div>
+<div class="note">
+  数据：盘口来自 OddsPapi（每家庄家的完整变盘记录，Pinnacle 为参考），球队近况来自 ESPN 赛果。每 6 小时自动更新。<br>
+  预期进球：用大小球 .5 盘口和去水后的概率按泊松分布反推，线和赔率的变化合成一个数。主队净胜球预期：用亚盘主盘口加赔率换算。<br>
+  盘口变化反映的是市场的判断，看到它变时，好价格往往已经没了。这里只提供信息，不是投注建议。
+</div></main>
+<script>
+const $=s=>document.querySelector(s);
+let DATA=null,onlyFlags=false,sortScore=false;
+const fmtT=t=>new Date(t*1000).toLocaleString("zh-CN", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+const dayKey=t=>new Date(t*1000).toLocaleDateString("zh-CN", {month:"long",day:"numeric",weekday:"short"});
+const pct=p=>(p*100).toFixed(0)+"%";
+const sgn=x=>(x>0?"+":"")+x;
+function esc(s){return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function spark(series,color){
+  const pts=(series||[]).filter(p=>p[1]!=null); if(pts.length<2) return "";
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const W=88,H=28,pad=3,sx=x=>pad+(W-2*pad)*(x1===x0?0.5:(x-x0)/(x1-x0)),sy=y=>H-pad-(H-2*pad)*(y1===y0?0.5:(y-y0)/(y1-y0));
+  const d=pts.map((p,i)=>(i?"L":"M")+sx(p[0]).toFixed(1)+" "+sy(p[1]).toFixed(1)).join(" ");
+  const l=pts[pts.length-1];
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6"/><circle cx="${sx(l[0])}" cy="${sy(l[1])}" r="2.4" fill="${color}"/></svg>`;
+}
+function dirCls(d,eps){return Math.abs(d)<eps?"":(d>0?"up":"down")}
+function mv(a,b,fmt,eps){return `${fmt(a)}<span class="arrow">→</span><b class="${dirCls(b-a,eps)}">${fmt(b)}</b>`}
+function mkOU(m){
+  if(!m) return "";
+  const o=m.open,n=m.now,f2=x=>x.toFixed(2),ln=x=>String(x);
+  const lam=(o.lam&&n.lam)?`<div class="row"><span class="lbl">预期进球</span>${mv(o.lam,n.lam,f2,0.05)}</div>`:"";
+  return `<div class="mk"><div class="k">大小球</div><div class="v"><div class="row"><span class="lbl">盘口</span>${ln(o.line)}<span class="arrow">→</span><b>${ln(n.line)}</b></div>${lam}<div class="sub">大 ${n.odds[0].toFixed(2)} / 小 ${n.odds[1].toFixed(2)} · 变盘 ${m.changes} 次</div></div>${spark(m.series,"var(--up)")}</div>`;
+}
+function ahLine(x){return x===0?"平手":(x<0?"让 "+(-x):"受让 "+x)}
+function mkAH(m){
+  if(!m) return "";
+  const o=m.open,n=m.now,sg=x=>sgn(x.toFixed(2));
+  return `<div class="mk"><div class="k">亚盘</div><div class="v"><div class="row"><span class="lbl">主队</span>${ahLine(o.line)}<span class="arrow">→</span><b>${ahLine(n.line)}</b></div><div class="row"><span class="lbl">净胜球</span>${mv(o.sup,n.sup,sg,0.05)}</div><div class="sub">主 ${n.odds[0].toFixed(2)} / 客 ${n.odds[1].toFixed(2)}</div></div>${spark(m.series,"var(--home)")}</div>`;
+}
+function mk12(m){
+  if(!m) return "";
+  const o=m.open.p,n=m.now.p,lab=["主胜","平局","客胜"];
+  const rows=n.map((p,i)=>`<div class="row"><span class="lbl">${lab[i]}</span>${mv(o[i],p,pct,0.015)}<span class="sub">　${m.now.odds[i].toFixed(2)}</span></div>`).join("");
+  return `<div class="mk"><div class="k">胜平负</div><div class="v">${rows}</div>${spark(m.series,"var(--good)")}</div>`;
+}
+function formBoxes(s){return s&&s.form?`<div class="form">${[...s.form].map(c=>`<span class="f ${c}">${c==="W"?"胜":c==="D"?"平":"负"}</span>`).join("")}</div>`:""}
+function statRow(lbl,h,a,f){return `<tr><td>${lbl}</td><td>${h&&h.n?f(h):"—"}</td><td>${a&&a.n?f(a):"—"}</td></tr>`}
+function statsBlock(fx){
+  const h=fx.stats.home,a=fx.stats.away;
+  if(!(h.all&&h.all.n)&&!(a.all&&a.all.n)) return `<div class="sub">暂无球队近况（ESPN 没有这两队的数据）</div>`;
+  const last=s=>s&&s.last?s.last.map(m=>`<div>${m.ha==="主"?"主":"客"} vs ${esc(m.opp)} <b>${m.score}</b></div>`).join(""):"<div>—</div>";
+  return `<details><summary>球队近况（近 10 场 / ${fx.home} 主场、${fx.away} 客场近 8 场）${fx.exp_total?`　基本面推算 ${fx.exp_total} 球`:""}</summary>
+  <table class="tbl"><tr><th></th><th>${esc(fx.home)}</th><th>${esc(fx.away)}</th></tr>
+  ${statRow("场均进/失",h.all,a.all,s=>`${s.gf} / ${s.ga}`)}
+  ${statRow("主/客场进/失",h.venue,a.venue,s=>`${s.gf} / ${s.ga}`)}
+  ${statRow("大 2.5",h.all,a.all,s=>pct(s.o25))}
+  ${statRow("双方进球",h.all,a.all,s=>pct(s.btts))}
+  ${statRow("零封",h.all,a.all,s=>pct(s.cs))}</table>
+  <div class="last"><div><div class="sub">${esc(fx.home)} 最近 5 场</div>${last(h.all)}</div><div><div class="sub">${esc(fx.away)} 最近 5 场</div>${last(a.all)}</div></div></details>`;
+}
+function cardHTML(fx){
+  const ref=fx.books.pinnacle||Object.values(fx.books)[0];
+  const bk=Object.keys(fx.books);
+  const flags=fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("");
+  return `<div class="card ${fx.score>=3?"hot":""}">
+   <div class="meta"><span class="lg">${esc(fx.country?fx.country+" · ":"")}${esc(fx.league)}</span><span>${fmtT(fx.start)}</span></div>
+   <div class="teams"><div class="tm">${esc(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${esc(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
+   ${ref?mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"]):`<div class="sub">暂无盘口数据</div>`}
+   ${flags?`<div class="flags">${flags}</div>`:""}
+   ${statsBlock(fx)}
+   ${bk.length?`<div class="books">庄家：${bk.join("、")}（显示 ${fx.books.pinnacle?"pinnacle":bk[0]}）</div>`:""}
+  </div>`;
+}
+function render(){
+  if(!DATA) return;
+  const q=$("#q").value.trim().toLowerCase(),lg=$("#lg").value;
+  let xs=DATA.fixtures.filter(f=>(!lg||f.league===lg)&&(!onlyFlags||f.flags.length)&&(!q||(f.home+f.away+f.league+f.country).toLowerCase().includes(q)));
+  if(!xs.length){$("#list").innerHTML=`<div class="empty">没有符合条件的比赛</div>`;return}
+  if(sortScore){xs=[...xs].sort((a,b)=>b.score-a.score||a.start-b.start);$("#list").innerHTML=`<div class="grid">${xs.map(cardHTML).join("")}</div>`;return}
+  const groups={};xs.forEach(f=>(groups[dayKey(f.start)]??=[]).push(f));
+  $("#list").innerHTML=Object.entries(groups).map(([d,fs])=>`<div class="day">${d} · ${fs.length} 场</div><div class="grid">${fs.map(cardHTML).join("")}</div>`).join("");
+}
+function init(d){
+  DATA=d;
+  $("#gen").textContent="更新于 "+fmtT(d.generated);
+  const s=d.summary;
+  $("#stats").innerHTML=`<span><b>${s.fixtures}</b>场比赛</span><span><b>${s.with_odds}</b>有盘口</span><span><b>${s.flags}</b>有信号</span>`;
+  const lgs={};d.fixtures.forEach(f=>lgs[f.league]=(lgs[f.league]||0)+1);
+  $("#lg").innerHTML=`<option value="">全部联赛（${d.fixtures.length}）</option>`+Object.entries(lgs).sort((a,b)=>b[1]-a[1]).map(([l,n])=>`<option value="${esc(l)}">${esc(l)}（${n}）</option>`).join("");
+  render();
+}
+$("#q").oninput=render;$("#lg").onchange=render;
+$("#onlyFlags").onclick=e=>{onlyFlags=!onlyFlags;e.target.classList.toggle("on",onlyFlags);render()};
+$("#sortScore").onclick=e=>{sortScore=!sortScore;e.target.classList.toggle("on",sortScore);render()};
+fetch("data.json?"+Date.now()).then(r=>r.json()).then(init).catch(()=>$("#list").innerHTML=`<div class="empty">还没有数据：第一次自动运行完成后这里会显示比赛。</div>`);
+</script>
+</body>
+</html>

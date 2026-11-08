@@ -1,0 +1,54 @@
+name: update-board
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"     # every 6 hours (UTC)
+  workflow_dispatch:
+    inputs:
+      inspect:
+        description: "print what the API returns (debug)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: board
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Build board
+        env:
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          HOURS: ${{ vars.HOURS }}
+          MAX_FIXTURES: ${{ vars.MAX_FIXTURES }}
+          BOOKS: ${{ vars.BOOKS }}
+        run: python -m board.build ${{ inputs.inspect && '--inspect' || '' }}
+      - name: Save caches (results, meta)
+        run: |
+          git config user.name "board-bot"
+          git config user.email "board-bot@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || git commit -m "update data cache"
+          git push || true
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
