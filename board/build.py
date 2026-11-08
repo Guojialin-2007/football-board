@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from . import history as H
+from . import leagues as LG
 from . import polyleagues as P
 from . import odds as O
 from . import signals as S
@@ -138,13 +139,19 @@ def run(inspect=False, log=print):
     hist = H.aggregate(DATA)
     fxs = upcoming(api, m["sid"], hours)
     top, tmap = (None, None)
-    if (env("ONLY_TOP", "1")) != "0":
+    mode = env("LEAGUES", "list")                       # list = the fixed list in board/leagues.py
+    if env("ONLY_TOP", "1") == "0":
+        mode = "all"
+    if mode == "list" and m.get("tours"):
+        tmap = LG.match(m["tours"], log=log)
+        top = [{"league": n, "volume": None} for n, _, _ in LG.RULES]
+    elif mode == "poly":
         top, tmap = P.load(DATA, fxs, log=log)
     if tmap:
         kept = [f for f in fxs if str(f.get("tournamentId")) in tmap]
         for f in kept:
             f["_pm"] = tmap[str(f.get("tournamentId"))]
-        log(f"[board] Polymarket top {len(top)} leagues: kept {len(kept)} of {len(fxs)} fixtures")
+        log(f"[board] {len(top)} chosen leagues: kept {len(kept)} of {len(fxs)} fixtures")
         fxs = kept
     log(f"[board] {len(fxs)} fixtures in the next {hours:.0f} h; fetching odds for up to {min(max_fx, len(fxs))}")
     if inspect and fxs:

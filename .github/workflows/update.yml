@@ -43,6 +43,7 @@ jobs:
           HIST_MIN: ${{ vars.HIST_MIN }}
           RESULTS_MIN: ${{ vars.RESULTS_MIN }}
           ONLY_TOP: ${{ vars.ONLY_TOP }}
+          LEAGUES: ${{ vars.LEAGUES }}
         run: python -m board.build ${{ inputs.inspect && '--inspect' || '' }}
       - name: Save caches (results, meta, history)
         if: always()
