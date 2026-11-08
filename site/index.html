@@ -104,6 +104,7 @@ details[open] summary::before{content:"▾ "}
 .idea .st{float:right;font-size:12px}
 .judge td:nth-child(n+2){text-align:right}
 @media (max-width:420px){.grid{grid-template-columns:1fr}.mk{grid-template-columns:46px minmax(0,1fr) 64px}.spark{width:64px}.row .lbl{min-width:44px}}
+.subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 </style>
 </head>
 <body>
@@ -258,8 +259,12 @@ function detailHTML(fx){
   // same move
   const sm=d.same_move||{};
   h+=`<h3>历史同升降（同联赛、盘口从开盘到收盘变化相同）</h3>`;
-  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${briefRows(a.list)}`}
-  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${briefRows(a.list)}`}
+  const subs=(a,ou)=>["water","timing"].map(k=>{const b=a[k];if(!b)return"";
+    const lab=k=="water"?"再加同水位变化":"再加同变盘时间";
+    const res=b.n?(ou?`<span>大球 <b>${P(b.over)}</b></span><span>小球 <b>${P(b.under)}</b></span>`:`<span>主队赢盘 <b>${P(b.home_cover)}</b></span><span>客队赢盘 <b>${P(b.away_cover)}</b></span>`)+(b.follow!=null?`<span>跟着买 ${R(b.follow)}</span><span>反着买 ${R(b.fade)}</span>`:""):`<span class="sub">暂无样本，慢慢积累</span>`;
+    return `<div class="kv subkv"><span>↳ ${lab}：<b>${esc(b.cls)}</b></span><span>样本 <b>${b.n}</b> 场</span>${res}<span class="sub">${esc(b.src||"")}</span></div>`}).join("");
+  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,false)}${briefRows(a.list)}`}
+  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,true)}${briefRows(a.list)}`}
   if(!sm.ah&&!sm.ou) h+=`<div class="hint">暂无盘口数据</div>`;
   // same odds
   const so=d.same_odds;

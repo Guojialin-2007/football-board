@@ -147,40 +147,111 @@ def _ah_block(sim_rows, ol, cl, get, limit, src):
     return res
 
 
+def _dp(o, c):
+    """Change of the first side's de-vigged probability from opening odds o to closing odds c."""
+    if not o or not c or not all(o) or not all(c):
+        return None
+    f = lambda x: (1 / x[0]) / (1 / x[0] + 1 / x[1])
+    return f(c) - f(o)
+
+
+WATER_TOL = 0.03          # ~0.12 in decimal odds near evens
+
+
+def water(dp, side):
+    if dp is None:
+        return None
+    return f"{side}水位降" if dp >= WATER_TOL else f"{side}水位升" if dp <= -WATER_TOL else "水位基本不变"
+
+
+def timing(hours):
+    if hours is None:
+        return "盘口没变"
+    return "开赛前 3 小时内" if hours < 3 else "开赛前 3–24 小时" if hours < 24 else "开赛 24 小时以前"
+
+
+def _now_timing(fx, m):
+    if "last_move_t" not in (m or {}):
+        return None
+    t = m["last_move_t"]
+    return timing((fx["start"] - t) / 3600 if t else None)
+
+
+def _sub(block_fn, rows, key_fn, want, ol, cl, get, src):
+    sub = [r for r in rows if key_fn(r) == want]
+    b = block_fn(sub, ol, cl, get, 0, src)
+    b["cls"] = want
+    return b
+
+
+def _ou_block(sim, ol, cl, src):
+    res = {"from": ol, "to": cl, "n": len(sim), "src": src}
+    if not sim:
+        return res
+    goals = [r["hs"] + r["as"] for r in sim]
+    sc = [H.settle_over(g, cl, 2.0) for g in goals]
+    res.update(over=round(sum(x > 0 for x in sc) / len(sc), 3), under=round(sum(x < 0 for x in sc) / len(sc), 3),
+               push=round(sum(x == 0 for x in sc) / len(sc), 3), over_k=sum(x > 0 for x in sc),
+               under_k=sum(x < 0 for x in sc), avg_goals=round(sum(goals) / len(goals), 2), follow=None, fade=None)
+    k = H.steps(ol, cl)
+    if k:
+        fol = [(H.settle_over if k > 0 else H.settle_under)(r["hs"] + r["as"], r["ou"]["cl"],
+               r["ou"]["codds"][0 if k > 0 else 1]) for r in sim]
+        fad = [(H.settle_under if k > 0 else H.settle_over)(r["hs"] + r["as"], r["ou"]["cl"],
+               r["ou"]["codds"][1 if k > 0 else 0]) for r in sim]
+        res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4))
+    return res
+
+
 def same_move(fd, league_rows, fx, ref, limit=20):
+    """Same opening -> closing line in the same league, then narrowed by the water (price) move and by when the
+    line last moved. football-data has opening/closing prices but no times, so timing uses the board's own history."""
     out = {}
     ah = (ref or {}).get("ah")
     if ah:
         ol, cl = ah["open"]["line"], ah["now"]["line"]
+        w_now = water(_dp(ah["open"].get("odds"), ah["now"].get("odds")), "主队")
+        t_now = _now_timing(fx, ah)
         rows = (fd.rows.get(fx["league"]) if fd is not None else None) or []
-        fdm = [r for r in rows if r["d"] < fx["start"] and r.get("ah") == ol and r.get("ahc") == cl]
+        own = [r for r in league_rows if r.get("ah") and r["ah"]["ol"] == ol and r["ah"]["cl"] == cl]
+        get_pp = lambda r: (r["hs"] - r["as"], r["ah"]["cl"], r["ah"]["codds"])
+        w_pp = lambda r: water(_dp(r["ah"].get("oodds"), r["ah"].get("codds")), "主队")
         if rows and any(r.get("ahc") is not None for r in rows):
-            b = _ah_block(fdm, ol, cl, lambda r: (r["hg"] - r["ag"], r["ahc"], r.get("ahco")), limit, "football-data（2019 起有收盘盘口）")
+            fdm = [r for r in rows if r["d"] < fx["start"] and r.get("ah") == ol and r.get("ahc") == cl]
+            get = lambda r: (r["hg"] - r["ag"], r["ahc"], r.get("ahco"))
+            src = "football-data（2019 起有收盘盘口）"
+            b = _ah_block(fdm, ol, cl, get, limit, src)
             b["list"] = [_row_fd(r) for r in sorted(fdm, key=lambda r: -r["d"])[:limit]]
+            if w_now:
+                b["water"] = _sub(_ah_block, fdm, lambda r: water(_dp(r.get("aho"), r.get("ahco")), "主队"), w_now,
+                                  ol, cl, get, src)
         else:
-            sim = [r for r in league_rows if r.get("ah") and r["ah"]["ol"] == ol and r["ah"]["cl"] == cl]
-            b = _ah_block(sim, ol, cl, lambda r: (r["hs"] - r["as"], r["ah"]["cl"], r["ah"]["codds"]), limit, "本站历史（2026 起）")
-            b["list"] = [_row_pp(r) for r in sorted(sim, key=lambda r: -r["t"])[:limit]]
+            src = "本站历史（2026 起）"
+            b = _ah_block(own, ol, cl, get_pp, limit, src)
+            b["list"] = [_row_pp(r) for r in sorted(own, key=lambda r: -r["t"])[:limit]]
+            if w_now:
+                b["water"] = _sub(_ah_block, own, w_pp, w_now, ol, cl, get_pp, src)
+        timed = [r for r in own if "lt" in r["ah"]]
+        if t_now:
+            b["timing"] = _sub(_ah_block, timed, lambda r: timing(r["ah"]["lt"]), t_now, ol, cl, get_pp,
+                           "本站历史（记录变盘时间，2026-11 起）")
         out["ah"] = b
     ou = (ref or {}).get("ou")
     if ou:
         ol, cl = ou["open"]["line"], ou["now"]["line"]
         sim = [r for r in league_rows if r.get("ou") and r["ou"]["ol"] == ol and r["ou"]["cl"] == cl]
-        res = {"from": ol, "to": cl, "n": len(sim), "src": "本站历史（2026 起）"}
+        src = "本站历史（2026 起）"
+        res = _ou_block(sim, ol, cl, src)
         if sim:
-            goals = [r["hs"] + r["as"] for r in sim]
-            sc = [H.settle_over(g, cl, 2.0) for g in goals]
-            res.update(over=round(sum(x > 0 for x in sc) / len(sc), 3), under=round(sum(x < 0 for x in sc) / len(sc), 3),
-                       push=round(sum(x == 0 for x in sc) / len(sc), 3), over_k=sum(x > 0 for x in sc),
-                       under_k=sum(x < 0 for x in sc), avg_goals=round(sum(goals) / len(goals), 2), follow=None, fade=None)
-            k = H.steps(ol, cl)
-            if k:
-                fol = [(H.settle_over if k > 0 else H.settle_under)(r["hs"] + r["as"], r["ou"]["cl"],
-                       r["ou"]["codds"][0 if k > 0 else 1]) for r in sim]
-                fad = [(H.settle_under if k > 0 else H.settle_over)(r["hs"] + r["as"], r["ou"]["cl"],
-                       r["ou"]["codds"][1 if k > 0 else 0]) for r in sim]
-                res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4))
             res["list"] = [_row_pp(r) for r in sorted(sim, key=lambda r: -r["t"])[:limit]]
+        w_now = water(_dp(ou["open"].get("odds"), ou["now"].get("odds")), "大球")
+        if w_now:
+            sub = [r for r in sim if water(_dp(r["ou"].get("oodds"), r["ou"].get("codds")), "大球") == w_now]
+            res["water"] = dict(_ou_block(sub, ol, cl, src), cls=w_now)
+        t_now = _now_timing(fx, ou)
+        sub = [r for r in sim if "lt" in r["ou"] and timing(r["ou"]["lt"]) == t_now]
+        if t_now:
+            res["timing"] = dict(_ou_block(sub, ol, cl, "本站历史（记录变盘时间，2026-11 起）"), cls=t_now)
         out["ou"] = res
     return out
 
@@ -213,11 +284,21 @@ def judgement(ref, so, sm, h2):
     if ou:
         n = m.get("over_k", 0) + m.get("under_k", 0)
         out.append(_j(f"大 {ou['now']['line']}", ou["now"]["p_over"], m.get("over_k", 0), n, "同升降"))
+        for key, lab in (("water", "同升降+同水位"), ("timing", "同升降+同变盘时间")):
+            sb = m.get(key)
+            if sb:
+                out.append(_j(f"大 {ou['now']['line']}（同升降，{sb['cls']}）", ou["now"]["p_over"], sb.get("over_k", 0),
+                              sb.get("over_k", 0) + sb.get("under_k", 0), lab))
     a = (ref or {}).get("ah")
     m = (sm or {}).get("ah") or {}
     if a:
         n = m.get("home_k", 0) + m.get("away_k", 0)
         out.append(_j(f"主队赢盘（{H.ah_name(a['now']['line'])}）", a["now"]["p_home"], m.get("home_k", 0), n, "同升降"))
+        for key, lab in (("water", "同升降+同水位"), ("timing", "同升降+同变盘时间")):
+            sb = m.get(key)
+            if sb:
+                out.append(_j(f"主队赢盘（同升降，{sb['cls']}）", a["now"]["p_home"], sb.get("home_k", 0),
+                              sb.get("home_k", 0) + sb.get("away_k", 0), lab))
     return [j for j in out if j]
 
 

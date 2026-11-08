@@ -177,6 +177,22 @@ def state_at(bd, t):
     return st
 
 
+def last_move(bd, kind, end):
+    """Time of the last main-line change of 'ou' or 'ah' at or before `end` (None if the line never moved)."""
+    groups = list((bd.get(kind) or {}).values())
+    prev, last = None, None
+    for t in _times(groups):
+        if t > end:
+            break
+        s = state_at(bd, t).get(kind)
+        if not s:
+            continue
+        if prev is not None and s["line"] != prev:
+            last = t
+        prev = s["line"]
+    return last
+
+
 def summarize(bd, now, kickoff, points=24):
     """Open (first moment each market had prices), now (latest before min(now, kickoff)), and a series."""
     end = min(now, kickoff) if kickoff else now
@@ -212,4 +228,6 @@ def summarize(bd, now, kickoff, points=24):
             series.append([t, round(v, 4)])
         out[kind] = {"open_t": first[0], "open": first[1], "now": cur, "series": series,
                      "changes": len(times)}
+        if kind in ("ou", "ah"):
+            out[kind]["last_move_t"] = last_move(bd, kind, end)
     return out

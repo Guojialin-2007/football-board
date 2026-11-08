@@ -215,6 +215,12 @@ def run(inspect=False, log=print):
         I.run({**seen, **{c["id"]: c for c in cards}}, result_of, DATA, SITE, log=log)
     except Exception as e:                 # noqa: BLE001  never lose the board because of the ideas job
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
+    t_rt = time.time()
+    try:                                   # older history rows: add when the line last moved
+        H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 15)) * 60, log=log)
+    except Exception as e:                 # noqa: BLE001
+        log(f"[history] retime stopped: {type(e).__name__}: {str(e)[:160]}")
+    hist_budget = max(0.0, hist_budget - (time.time() - t_rt))
     try:                                   # spare time: finished matches for the "what happened before" tables
         H.backfill(api, m["sid"], m["markets"], DATA, teams, hist_budget, log=log,
                    allowed=set(tmap) if tmap else None)

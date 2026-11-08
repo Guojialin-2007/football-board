@@ -115,12 +115,16 @@ def row_from(f, comp, result):
     r = {"id": str(f.get("fixtureId")), "t": k, "home": f.get("participant1Name"), "away": f.get("participant2Name"),
          "lg": f.get("tournamentName") or str(f.get("tournamentId") or ""), "tid": str(f.get("tournamentId") or ""),
          "hs": result[0], "as": result[1]}
+    def lt(kind):
+        t = O.last_move(bd, kind, k - 60)
+        return round((k - t) / 3600, 2) if t else None
+
     if "ou" in op and "ou" in cl:
         r["ou"] = {"ol": op["ou"]["line"], "cl": cl["ou"]["line"], "olam": op["ou"].get("lam"), "clam": cl["ou"].get("lam"),
-                   "codds": cl["ou"]["odds"], "oodds": op["ou"]["odds"]}
+                   "codds": cl["ou"]["odds"], "oodds": op["ou"]["odds"], "lt": lt("ou")}
     if "ah" in op and "ah" in cl:
         r["ah"] = {"ol": op["ah"]["line"], "cl": cl["ah"]["line"], "osup": op["ah"]["sup"], "csup": cl["ah"]["sup"],
-                   "codds": cl["ah"]["odds"], "oodds": op["ah"]["odds"]}
+                   "codds": cl["ah"]["odds"], "oodds": op["ah"]["odds"], "lt": lt("ah")}
     if "1x2" in op and "1x2" in cl:
         r["x2"] = {"op": op["1x2"]["p"], "cp": cl["1x2"]["p"], "codds": cl["1x2"]["odds"], "oodds": op["1x2"]["odds"]}
     return r if ("ou" in r or "ah" in r) else None
@@ -220,6 +224,38 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
     json.dump(st, open(sp, "w"))
     log(f"[history] {listed} week lists fetched, {added} finished matches added in {(time.time() - t0) / 60:.0f} min")
     return added
+
+
+def retime(api, cls, data_dir, budget_s, log=print):
+    """Older rows were saved without the time of the last line move ('lt'); fetch their odds again (free endpoint)
+    and add it, a few hundred per run, newest first."""
+    p = os.path.join(data_dir, "history", "rows.jsonl")
+    if not os.path.exists(p) or budget_s <= 0:
+        return 0
+    rows = [json.loads(x) for x in open(p, encoding="utf-8") if x.strip()]
+    todo = sorted([r for r in rows if any(m in r and "lt" not in r[m] for m in ("ah", "ou"))], key=lambda r: -r["t"])
+    t0, done = time.time(), 0
+    for r in todo:
+        if time.time() - t0 > budget_s:
+            break
+        try:
+            js = api.get("/v4/historical-odds", fixtureId=r["id"], bookmakers="pinnacle")
+            bd = O.compact(js, cls, ["pinnacle"]).get("pinnacle") or {}
+        except RuntimeError:
+            bd = {}
+        for m in ("ah", "ou"):
+            if m in r:
+                t = O.last_move(bd, m, r["t"] - 60) if bd else None
+                r[m]["lt"] = round((r["t"] - t) / 3600, 2) if t else None
+        done += 1
+    if done:
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            for r in rows:
+                fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+        os.replace(tmp, p)
+    log(f"[history] line-move times added to {done} older matches; {len(todo) - done} left")
+    return done
 
 
 def load_rows(data_dir):
