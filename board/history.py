@@ -188,7 +188,8 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
         else:
             p = os.path.join(d, f"fx_{key}.json")
             fx = json.load(open(p)) if os.path.exists(p) else []
-        queue += [f for f in fx if str(f.get("fixtureId")) not in tried and f.get("hasOdds") is not False
+        # (no hasOdds filter here: finished matches report hasOdds=false once their markets close)
+        queue += [f for f in fx if str(f.get("fixtureId")) not in tried
                   and (allowed is None or str(f.get("tournamentId")) in allowed)]
         if len(queue) > 400:
             break
