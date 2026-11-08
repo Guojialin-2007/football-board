@@ -58,15 +58,22 @@ def parse_board(js, lg="all"):
     return out
 
 
-def fetch_results(data_dir, days=300, recent=3, session=None, sleep=time.sleep, log=print):
-    """One cached file per day (all leagues). Re-fetches the last `recent` days every run."""
+def fetch_results(data_dir, days=300, recent=3, session=None, sleep=time.sleep, log=print, budget_s=None):
+    """One cached file per day (all leagues). Newest days first; re-fetches the last `recent` days every run.
+    Stops after `budget_s` seconds (default env RESULTS_MIN, 20 min) - the rest is fetched by later runs."""
+    if budget_s is None:
+        budget_s = float(os.environ.get("RESULTS_MIN") or 20) * 60
+    t0 = time.time()
     s = session or requests.Session()
     d = os.path.join(data_dir, "results")
     os.makedirs(d, exist_ok=True)
     today = datetime.now(timezone.utc).date()
     mode = None
     fetched = 0
-    for k in range(days, -1, -1):
+    for k in range(0, days + 1):
+        if time.time() - t0 > budget_s:
+            log(f"[stats] results: time budget used, continuing next run (reached {k} days back)")
+            break
         day = today - timedelta(days=k)
         path = os.path.join(d, f"{day:%Y%m%d}.json")
         if os.path.exists(path) and k > recent:

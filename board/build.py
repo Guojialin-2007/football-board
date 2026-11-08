@@ -125,8 +125,8 @@ def run(inspect=False, log=print):
     env = lambda k, d: os.environ.get(k) or d          # empty repository variables fall back to the default
     hours = float(env("HOURS", 36))
     max_fx = int(env("MAX_FIXTURES", 700))
-    budget = float(env("BUDGET_MIN", 120)) * 60
-    hist_budget = float(env("HIST_MIN", 90)) * 60
+    budget = float(env("BUDGET_MIN", 110)) * 60
+    hist_budget = float(env("HIST_MIN", 60)) * 60
     books = [b.strip() for b in env("BOOKS", "pinnacle,bet365,1xbet").split(",") if b.strip()][:3]
     api = Papi()
     m = meta(api, log=log)

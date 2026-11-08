@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 340
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -33,23 +33,34 @@ jobs:
           python-version: "3.12"
       - run: pip install requests
       - name: Build board
+        timeout-minutes: 280
+        continue-on-error: true
         env:
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           HOURS: ${{ vars.HOURS }}
           MAX_FIXTURES: ${{ vars.MAX_FIXTURES }}
           BOOKS: ${{ vars.BOOKS }}
           HIST_MIN: ${{ vars.HIST_MIN }}
+          RESULTS_MIN: ${{ vars.RESULTS_MIN }}
         run: python -m board.build ${{ inputs.inspect && '--inspect' || '' }}
-      - name: Save caches (results, meta)
+      - name: Save caches (results, meta, history)
+        if: always()
         run: |
           git config user.name "board-bot"
           git config user.email "board-bot@users.noreply.github.com"
           git add data
           git diff --cached --quiet || git commit -m "update data cache"
+          git pull --rebase -X theirs || true
           git push || true
+      - name: Check output
+        id: out
+        run: test -f site/data.json && echo "ok=1" >> "$GITHUB_OUTPUT" || echo "no data.json this run"
       - uses: actions/configure-pages@v5
+        if: steps.out.outputs.ok == '1'
       - uses: actions/upload-pages-artifact@v3
+        if: steps.out.outputs.ok == '1'
         with:
           path: site
       - id: deploy
+        if: steps.out.outputs.ok == '1'
         uses: actions/deploy-pages@v4
