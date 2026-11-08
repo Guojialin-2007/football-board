@@ -251,25 +251,31 @@ function detailHTML(fx){
     h+=sp.map(([k,l,c])=>`<div class="sub" style="margin-top:8px">${l}</div>${bigSpark(ref[k].series,c)}`).join("");
   } else h+=`<div class="hint">暂无盘口数据</div>`;
   // judgement
-  h+=`<h3>判断（市场 vs 历史同类比赛）</h3><div class="hint">样本越多，历史的权重越大：估计 =（40×市场 + 样本数×历史）÷（40 + 样本数）。同联赛样本少于 15 场时不给判断。这是统计倾向，不是预测。</div>`;
-  if(d.judge&&d.judge.length){h+=`<table class="ht judge"><tr><th>项目</th><th>市场概率</th><th>历史同类</th><th>样本</th><th>综合估计</th><th>差值</th></tr>${d.judge.map(j=>`<tr><td>${esc(j.what)}<span class="sub">（${j.src}）</span></td><td>${P(j.market)}</td><td>${P(j.hist)}</td><td>${j.n}</td><td><b>${P(j.est)}</b></td><td>${j.edge==null?"—":`<span class="${j.edge>0?"pos":"neg"}">${(j.edge*100).toFixed(1)}%</span>`}</td></tr>`).join("")}</table>`}
-  else h+=`<div class="hint">同联赛历史样本还不够（目前 ${d.league_n||0} 场），积累几天后这里会出现判断。</div>`;
+  const CF={"低":"neg","中":"","高":"pos"};
+  h+=`<h3>判断（市场 vs 历史同类比赛）</h3><div class="hint">综合估计 =（40×市场 + 样本数×历史）÷（40 + 样本数）：样本越多，历史的权重越大。置信度看样本数（&lt;30 低、&lt;150 中、≥150 高），历史区间是 95% 置信区间，区间越宽越不可信。这是统计倾向，不是预测。</div>`;
+  if(d.judge&&d.judge.length){h+=`<div class="scroll"><table class="ht judge"><tr><th>项目</th><th>市场概率</th><th>历史同类</th><th>历史 95% 区间</th><th>样本</th><th>置信度</th><th>综合估计</th><th>差值</th></tr>${d.judge.map(j=>`<tr><td>${esc(j.what)}<span class="sub">（${j.src}）</span></td><td>${P(j.market)}</td><td>${P(j.hist)}</td><td>${j.ci?P(j.ci[0])+" ~ "+P(j.ci[1]):"—"}</td><td>${j.n}</td><td class="${CF[j.conf]}">${j.conf}</td><td><b>${P(j.est)}</b></td><td>${j.edge==null?"—":`<span class="${j.edge>0?"pos":"neg"}">${(j.edge*100).toFixed(1)}%</span>`}</td></tr>`).join("")}</table></div>`}
+  else h+=`<div class="hint">暂无盘口数据，无法判断。</div>`;
   // same move
   const sm=d.same_move||{};
   h+=`<h3>历史同升降（同联赛、盘口从开盘到收盘变化相同）</h3>`;
-  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}</div>${briefRows(a.list)}`}
-  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}</div>${briefRows(a.list)}`}
+  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${briefRows(a.list)}`}
+  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${briefRows(a.list)}`}
   if(!sm.ah&&!sm.ou) h+=`<div class="hint">暂无盘口数据</div>`;
   // same odds
   const so=d.same_odds;
-  h+=`<h3>历史同赔（同联赛、Pinnacle 初赔主/平/客相近）</h3>`;
-  if(so&&so.n){const [w,dd,l]=so.wdl;h+=`<div class="kv"><span>本场初赔 <b>${so.odds.join(" / ")}</b></span><span>样本 <b>${so.n}</b> 场</span><span>主胜 <b>${P(w/so.n)}</b></span><span>平 <b>${P(dd/so.n)}</b></span><span>客胜 <b>${P(l/so.n)}</b></span><span>平均进球 ${so.avg_goals}</span><span>大2.5 ${P(so.o25)}</span></div>${briefRows(so.list)}`}
-  else h+=`<div class="hint">${so?`本场初赔 ${so.odds.join(" / ")}，`:""}同联赛还没有相近初赔的历史比赛。</div>`;
+  const wdl=(x,who)=>x&&x.n?`<span>${who}胜 <b>${P(x.w/x.n)}</b></span><span>平 <b>${P(x.d/x.n)}</b></span><span>${who}负 <b>${P(x.l/x.n)}</b></span><span>场均进球 ${x.avg_goals}</span><span>大2.5 ${P(x.o25)}</span>`:"";
+  h+=`<h3>历史同赔</h3>`;
+  if(so){
+    h+=`<div class="hint">本场 Pinnacle 初赔 <b>${so.odds.join(" / ")}</b>。主/平/客赔率都相近才算同赔${so.league&&so.league.basis==="收盘"?"（这个联赛的历史数据只有收盘赔率）":""}。</div>`;
+    if(so.home_team) h+=`<div class="kv"><span><b>${esc(fx.home)}</b> 主场、主胜赔率相近</span><span>样本 <b>${so.home_team.n}</b> 场</span>${wdl(so.home_team,"")}</div>${briefRows(so.home_team.list)}`;
+    if(so.away_team) h+=`<div class="kv"><span><b>${esc(fx.away)}</b> 客场、客胜赔率相近</span><span>样本 <b>${so.away_team.n}</b> 场</span>${wdl(so.away_team,"")}</div>${briefRows(so.away_team.list)}`;
+    if(so.league) h+=`<div class="kv"><span>同联赛所有球队</span><span>样本 <b>${so.league.n}</b> 场</span>${wdl(so.league,"主")}<span class="sub">${esc(so.league.src||"")}</span></div>${briefRows(so.league.list)}`;
+  } else h+=`<div class="hint">暂无赔率数据。</div>`;
   // h2h
   const hh=d.h2h;
-  h+=`<h3>历史交手（近一年）</h3>`;
-  if(hh&&hh.n){h+=`<div class="kv"><span>${hh.n} 场</span><span>${esc(fx.home)} 胜 <b>${hh.home_w}</b></span><span>平 <b>${hh.draw}</b></span><span>${esc(fx.away)} 胜 <b>${hh.away_w}</b></span><span>场均进球 ${hh.avg_goals}</span><span>大2.5 ${P(hh.o25)}</span></div><div class="scroll"><table class="ht"><tr><th>日期</th><th>主</th><th>比分</th><th>客</th></tr>${hh.list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td>${esc(r.home)}</td><td><b>${r.score}</b></td><td>${esc(r.away)}</td></tr>`).join("")}</table></div>`}
-  else h+=`<div class="hint">近一年没有交手记录（或 ESPN 没有这两队的数据）。</div>`;
+  h+=`<h3>历史交手${hh&&hh.src?`<span class="sub">　${esc(hh.src)}</span>`:""}</h3>`;
+  if(hh&&hh.n){h+=`<div class="kv"><span>${hh.n} 场${hh.years?`（跨度 ${hh.years} 年）`:""}</span><span>${esc(fx.home)} 胜 <b>${hh.w}</b></span><span>平 <b>${hh.d}</b></span><span>${esc(fx.home)} 负 <b>${hh.l}</b></span><span>场均进球 ${hh.avg_goals}</span><span>大2.5 ${P(hh.o25)}</span></div>${briefRows(hh.list)}`}
+  else h+=`<div class="hint">没有找到交手记录（这个联赛没有长期历史数据，或两队名称没对上）。</div>`;
   // team form
   h+=`<h3>球队近况</h3>`+statsBlock(fx).replace("<details>","<details open>");
   // ideas

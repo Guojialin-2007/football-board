@@ -121,6 +121,7 @@ def test_board_end_to_end():
         fs = FakeSession()
         os.environ["ODDSPAPI_KEY"] = "test-key"
         os.environ["ONLY_TOP"] = "0"
+        os.environ["FD_MIN"] = "0"
         orig_papi, orig_fetch = B.Papi, T.fetch_results
         B.Papi = lambda: orig_papi(session=fs, sleep=lambda s: None)
         B.T.fetch_results = lambda data_dir, days=40, log=print: orig_fetch(data_dir, days=40, session=fs, sleep=lambda s: None, log=log)
@@ -229,6 +230,36 @@ def test_ideas():
         assert out["all"]["n"] == 1 and out["all"]["win"] == 1                 # #8 came after kickoff: not counted
         assert dict(g.replies) == {7: "✅正确", 8: "❌错误"}
         assert out["tags"]["盘口升降"]["n"] == 1
+
+
+def test_football_data_history():
+    from board import detail as Dt
+    from board import fd as F
+    csv_main = ("Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR,PSH,PSD,PSA,PSCH,PSCD,PSCA,AHh,PAHH,PAHA,AHCh,PCAHH,PCAHA,P>2.5,P<2.5\n"
+                "E0,10/08/2024,15:00,Arsenal,Chelsea,2,1,H,2.10,3.40,3.60,2.00,3.50,3.90,-0.5,1.95,1.95,-0.75,1.92,1.98,1.90,1.95\n"
+                "E0,12/01/2025,15:00,Chelsea,Arsenal,0,0,D,2.60,3.30,2.80,2.70,3.30,2.70,0,1.95,1.95,0,1.90,2.00,2.0,1.85\n"
+                "E0,03/03/2025,15:00,Arsenal,Fulham,3,0,H,2.12,3.38,3.55,1.80,3.80,4.60,-0.5,1.90,2.00,-0.75,1.95,1.95,1.8,2.0\n"
+                "E0,05/04/2025,15:00,Man United,Arsenal,1,1,D,3.00,3.30,2.40,3.0,3.3,2.4,0.25,1.9,2.0,0.25,1.9,2.0,1.9,1.9\n")
+    rows = F.parse_csv(csv_main)
+    assert len(rows) == 4 and rows[0]["o"] == [2.1, 3.4, 3.6] and rows[0]["ah"] == -0.5 and rows[0]["ahc"] == -0.75
+    csv_new = "Country,League,Season,Date,Time,Home,Away,HG,AG,Res,PSCH,PSCD,PSCA\nBrazil,Serie A,2024,14/04/2024,20:00,Flamengo,Palmeiras,1,0,H,2.1,3.2,3.6\n"
+    assert F.parse_csv(csv_new, extra=True)[0]["c"] == [2.1, 3.2, 3.6]
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, "fd"))
+        json.dump(rows, open(os.path.join(d, "fd", "E0_2425.json"), "w"))
+        fdx = F.FD(d)
+        assert fdx.team("Arsenal FC", "英超") == "Arsenal" and fdx.team("Manchester United", "英超") == "Man United"
+        start = int(NOW.timestamp())
+        fx = {"home": "Arsenal FC", "away": "Chelsea FC", "league": "英超", "start": start,
+              "books": {"pinnacle": {"1x2": {"open": {"odds": [2.11, 3.4, 3.6]}, "now": {"odds": [2.0, 3.5, 3.9],
+                                                                                  "p": [0.47, 0.28, 0.25]}},
+                                     "ah": {"open": {"line": -0.5}, "now": {"line": -0.75, "p_home": 0.5}}}}}
+        det = Dt.build(fx, T.Teams([]), [], fdx)
+        assert det["h2h"]["n"] == 2 and det["h2h"]["w"] == 1 and det["h2h"]["d"] == 1     # Arsenal's view
+        so = det["same_odds"]
+        assert so["home_team"]["n"] == 2 and so["league"]["n"] == 2                           # 10/08 and 03/03 match
+        assert det["same_move"]["ah"]["n"] == 2 and det["same_move"]["ah"]["home_k"] == 2     # -0.75: 2-1 half win, 3-0 win
+        assert all(j["conf"] == "低" for j in det["judge"]) and det["judge"][0]["ci"]
 
 
 def test_lambda_inverse():

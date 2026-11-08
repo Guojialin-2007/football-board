@@ -17,6 +17,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 from . import detail as D
+from . import fd as FDM
 from . import history as H
 from . import ideas as I
 from . import leagues as LG
@@ -184,8 +185,15 @@ def run(inspect=False, log=print):
         lg = (tmap or {}).get(str(r.get("tid") or ""))
         if lg:
             by_league.setdefault(lg, []).append(r)
+    fdx = None
+    try:                                   # football-data.co.uk: 20 seasons of results + odds
+        FDM.fetch(DATA, [n for n, _, _ in LG.RULES], log=log, budget_s=float(env("FD_MIN", 12)) * 60)
+        fdx = FDM.FD(DATA)
+        log(f"[fd] {fdx.n()} matches loaded for {len(fdx.rows)} leagues")
+    except Exception as e:                 # noqa: BLE001
+        log(f"[fd] skipped: {type(e).__name__}: {str(e)[:160]}")
     for c in cards:
-        c["detail"] = D.build(c, teams, by_league.get(c["league"], []))
+        c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx)
     # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known
     seen_p = os.path.join(DATA, "seen.json")
     seen = json.load(open(seen_p)) if os.path.exists(seen_p) else {}
