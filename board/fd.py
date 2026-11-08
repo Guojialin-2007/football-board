@@ -32,7 +32,7 @@ FD_ALIAS = {"ath madrid": "atletico madrid", "ath bilbao": "athletic bilbao", "n
             "man united": "manchester united", "man city": "manchester city", "sheffield weds": "sheffield wednesday",
             "sheffield united": "sheffield united", "qpr": "queens park rangers", "west brom": "west bromwich albion",
             "wolves": "wolverhampton wanderers", "spurs": "tottenham", "m'gladbach": "monchengladbach",
-            "ein frankfurt": "eintracht frankfurt", "fc koln": "koln", "paris sg": "paris saint germain",
+            "ein frankfurt": "eintracht frankfurt", "fc koln": "cologne koln", "rennes": "stade rennais", "nacional": "nacional madeira", "sp gijon": "sporting gijon", "paris sg": "paris saint germain",
             "sp lisbon": "sporting cp", "sp braga": "braga", "vitoria": "vitoria guimaraes", "betis": "real betis",
             "sociedad": "real sociedad", "espanol": "espanyol", "celta": "celta vigo", "la coruna": "deportivo la coruna",
             "inter": "inter milan", "milan": "ac milan", "verona": "hellas verona", "spal": "spal ferrara",
