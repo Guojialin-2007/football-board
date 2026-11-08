@@ -115,13 +115,26 @@ def card(f, comp, teams, tours, now, hist=None):
     fx["exp_total"] = T.expected_total(hs["venue"], as_["venue"])
     fx["flags"] = S.flags(fx)
     fx["hist"] = H.lookup(hist, fx)
+    ref = fx["books"].get("pinnacle") or next(iter(fx["books"].values()), {})
     for kind, label in (("ou", "大小球"), ("ah", "亚盘")):
         h = (fx["hist"] or {}).get(kind)
         if h and h["n"] >= 30 and h.get("fade") is not None:
-            better = "反着买" if h["fade"] > h["follow"] else "跟着买"
+            up = h["k"] > 0
+            ln = ((ref.get(kind) or {}).get("now") or {}).get("line")
+            if kind == "ou":
+                fol, fad = (f"买大 {ln:g}", f"买小 {ln:g}") if ln is not None else ("买大", "买小")
+                fol, fad = (fol, fad) if up else (fad, fol)
+                mv = f"{'升' if up else '降'} {abs(h['k'])} 档{'及以上' if abs(h['k']) >= 3 else ''}"
+            else:
+                side = (f"主队（{H.ah_name(ln)}）", "客队") if ln is not None else ("主队", "客队")
+                fol, fad = (f"买{side[0]}", f"买{side[1]}") if up else (f"买{side[1]}", f"买{side[0]}")
+                mv = f"往{'主队' if up else '客队'}方向变 {abs(h['k'])} 档{'及以上' if abs(h['k']) >= 3 else ''}"
+            ci = h.get("follow_ci")
+            sig = ("，区间跨过 0，看不出真差别" if ci and ci[0] < 0 < ci[1] else "")
             fx["flags"].append({"k": "hist", "lv": 1, "dir": kind,
-                                "t": f"历史：{label}同样{'升' if h['k'] > 0 else '降'} {abs(h['k'])} 档的 {h['n']} 场，"
-                                     f"跟着买回报 {h['follow'] * 100:+.1f}%，反着买 {h['fade'] * 100:+.1f}%（{better}更好，样本内）"})
+                                "t": f"历史：{label}同样{mv}的 {h['n']} 场（本站，各联赛合计）——"
+                                     f"跟着买（{fol}，收盘赔率）平均每注 {h['follow'] * 100:+.1f}%，"
+                                     f"反着买（{fad}）{h['fade'] * 100:+.1f}%{sig}"})
     fx["score"] = sum(x["lv"] for x in fx["flags"])
     return fx
 
