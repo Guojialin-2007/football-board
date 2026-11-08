@@ -69,7 +69,7 @@ def upcoming(api, sid, hours):
     out = []
     for f in rows:
         st = ts(f.get("startTime"))
-        if not st or st < now.timestamp():
+        if not st or st < now.timestamp() or f.get("hasOdds") is False:
             continue
         out.append(f)
     return sorted(out, key=lambda f: f.get("startTime", ""))
@@ -80,6 +80,8 @@ def odds_for(api, f, cls, books, log=print):
     try:
         js = api.get("/v4/historical-odds", fixtureId=fid, bookmakers=",".join(books))
     except RuntimeError as e:
+        if " 404" in str(e) or "NOT_FOUND" in str(e):
+            return None                                   # no odds recorded for this match at all
         if "pinnacle" in books and len(books) > 1:
             log(f"[odds] {fid}: {str(e)[:120]} -> retry with pinnacle only")
             js = api.get("/v4/historical-odds", fixtureId=fid, bookmakers="pinnacle")

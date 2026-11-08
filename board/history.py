@@ -188,7 +188,7 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7)
         else:
             p = os.path.join(d, f"fx_{key}.json")
             fx = json.load(open(p)) if os.path.exists(p) else []
-        queue += [f for f in fx if str(f.get("fixtureId")) not in tried]
+        queue += [f for f in fx if str(f.get("fixtureId")) not in tried and f.get("hasOdds") is not False]
         if len(queue) > 400:
             break
         wk = a
@@ -206,7 +206,8 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7)
             try:
                 js = api.get("/v4/historical-odds", fixtureId=fid, bookmakers="pinnacle")
             except RuntimeError as e:
-                log(f"[history] odds {fid}: {str(e)[:100]}")
+                if " 404" not in str(e) and "NOT_FOUND" not in str(e):
+                    log(f"[history] odds {fid}: {str(e)[:100]}")
                 continue
             r = row_from(f, O.compact(js, cls, ["pinnacle"]), res)
             if r:
