@@ -38,6 +38,7 @@ jobs:
           HOURS: ${{ vars.HOURS }}
           MAX_FIXTURES: ${{ vars.MAX_FIXTURES }}
           BOOKS: ${{ vars.BOOKS }}
+          HIST_MIN: ${{ vars.HIST_MIN }}
         run: python -m board.build ${{ inputs.inspect && '--inspect' || '' }}
       - name: Save caches (results, meta)
         run: |

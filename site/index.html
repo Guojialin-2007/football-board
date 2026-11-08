@@ -73,6 +73,16 @@ details[open] summary::before{content:"▾ "}
 .empty{color:var(--muted);text-align:center;padding:60px 0}
 .note{color:var(--faint);font-size:12px;margin-top:30px;line-height:1.7}
 .books{font-size:11px;color:var(--faint)}
+#hist{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
+#hist h2{font-size:15px;margin:0 0 4px}
+#hist h3{font-size:13px;margin:18px 0 6px;color:var(--muted);font-weight:500}
+#hist p{color:var(--muted);font-size:12.5px;margin:4px 0 10px;line-height:1.7}
+.ht{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+.ht th{color:var(--faint);font-weight:400;text-align:right;padding:5px 6px;border-bottom:1px solid var(--line)}
+.ht td{text-align:right;padding:5px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.ht td:first-child,.ht th:first-child{text-align:left}
+.pos{color:var(--good)}.neg{color:var(--up)}
+.scroll{overflow-x:auto}
 @media (max-width:420px){.grid{grid-template-columns:1fr}.mk{grid-template-columns:46px minmax(0,1fr) 64px}.spark{width:64px}.row .lbl{min-width:44px}}
 </style>
 </head>
@@ -87,9 +97,10 @@ details[open] summary::before{content:"▾ "}
     <select id="lg"><option value="">全部联赛</option></select>
     <span class="chip" id="onlyFlags">只看有信号</span>
     <span class="chip" id="sortScore">按信号强度排序</span>
+    <span class="chip" id="histTab">历史规律</span>
   </div>
 </div></header>
-<main class="wrap"><div id="list"><div class="empty">加载中…</div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">
   数据：盘口来自 OddsPapi（每家庄家的完整变盘记录，Pinnacle 为参考），球队近况来自 ESPN 赛果。每 6 小时自动更新。<br>
   预期进球：用大小球 .5 盘口和去水后的概率按泊松分布反推，线和赔率的变化合成一个数。主队净胜球预期：用亚盘主盘口加赔率换算。<br>
@@ -120,7 +131,8 @@ function mkOU(m){
   const lam=(o.lam&&n.lam)?`<div class="row"><span class="lbl">预期进球</span>${mv(o.lam,n.lam,f2,0.05)}</div>`:"";
   return `<div class="mk"><div class="k">大小球</div><div class="v"><div class="row"><span class="lbl">盘口</span>${ln(o.line)}<span class="arrow">→</span><b>${ln(n.line)}</b></div>${lam}<div class="sub">大 ${n.odds[0].toFixed(2)} / 小 ${n.odds[1].toFixed(2)} · 变盘 ${m.changes} 次</div></div>${spark(m.series,"var(--up)")}</div>`;
 }
-function ahLine(x){return x===0?"平手":(x<0?"让 "+(-x):"受让 "+x)}
+const AHN={0:"平手",0.25:"平半",0.5:"半球",0.75:"半一",1:"一球",1.25:"一球/球半",1.5:"球半",1.75:"球半/两球",2:"两球",2.25:"两球/两球半",2.5:"两球半",2.75:"两球半/三球",3:"三球"};
+function ahLine(x){if(x===0)return "平手";const n=AHN[Math.abs(x)]||Math.abs(x)+"球";return (x<0?"让":"受让")+n}
 function mkAH(m){
   if(!m) return "";
   const o=m.open,n=m.now,sg=x=>sgn(x.toFixed(2));
@@ -178,6 +190,26 @@ function init(d){
   $("#lg").innerHTML=`<option value="">全部联赛（${d.fixtures.length}）</option>`+Object.entries(lgs).sort((a,b)=>b[1]-a[1]).map(([l,n])=>`<option value="${esc(l)}">${esc(l)}（${n}）</option>`).join("");
   render();
 }
+function histTable(g,kind){
+  const keys=Object.keys(g||{}).map(Number).sort((a,b)=>a-b);
+  if(!keys.length) return `<p>还没有足够的历史比赛。</p>`;
+  const lab=k=>k===0?"不变":(kind==="ou"?(k>0?"升 ":"降 ")+Math.abs(k)+" 档":(k>0?"向主队 ":"向客队 ")+Math.abs(k)+" 档")+(Math.abs(k)>=3?"及以上":"");
+  const f2=x=>x==null?"—":x.toFixed(2), pc=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
+  const ci=c=>c?`<span class="sub">${(c[0]*100).toFixed(0)}~${(c[1]*100).toFixed(0)}%</span>`:"";
+  const what=kind==="ou"?["平均进球","开盘预期","收盘预期","超过开盘线"]:["平均净胜球","开盘预期","收盘预期","赢开盘盘口"];
+  return `<div class="scroll"><table class="ht"><tr><th>收盘相比开盘</th><th>场数</th><th>${what[0]}</th><th>${what[1]}</th><th>${what[2]}</th><th>按变动方向${what[3]}</th><th>跟着买（收盘价）</th><th>反着买（收盘价）</th></tr>
+  ${keys.map(k=>{const x=g[k];return `<tr><td>${lab(k)}</td><td>${x.n}</td><td>${f2(x.actual)}</td><td>${f2(x.open)}</td><td>${f2(x.close)}</td><td>${x.went==null?"—":(x.went*100).toFixed(0)+"%"}</td><td>${pc(x.follow)} ${ci(x.follow_ci)}</td><td>${pc(x.fade)} ${ci(x.fade_ci)}</td></tr>`}).join("")}</table></div>`;
+}
+function renderHist(h){
+  if(!h||!h.n){$("#hist").innerHTML=`<h2>历史规律</h2><p>历史比赛还在积累中：每次自动更新都会补几百场已完赛的比赛，几天后这里就有数据。</p>`;return}
+  $("#hist").innerHTML=`<h2>历史规律：盘口升降档之后，比赛最后怎么结束</h2>
+  <p>${h.n} 场已完赛的比赛（Pinnacle 开盘 vs 收盘，${new Date(h.since*1000).toLocaleDateString("zh-CN")} 起）。"档" = 0.25 球。
+  "跟着买" = 按盘口变动的方向、以收盘赔率下注；"反着买" = 认为是诱盘、反方向下注。回报按亚洲盘结算，扣了庄家抽水；括号里是 95% 区间，跨过 0 就说明看不出差别。</p>
+  <h3>大小球（盘口线升降）</h3>${histTable(h.ou,"ou")}
+  <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
+}
+$("#histTab").onclick=e=>{const on=$("#hist").hidden;$("#hist").hidden=!on;e.target.classList.toggle("on",on)};
+fetch("history.json?"+Date.now()).then(r=>r.json()).then(renderHist).catch(()=>renderHist(null));
 $("#q").oninput=render;$("#lg").onchange=render;
 $("#onlyFlags").onclick=e=>{onlyFlags=!onlyFlags;e.target.classList.toggle("on",onlyFlags);render()};
 $("#sortScore").onclick=e=>{sortScore=!sortScore;e.target.classList.toggle("on",sortScore);render()};

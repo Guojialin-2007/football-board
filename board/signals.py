@@ -3,6 +3,8 @@ none of them is a betting instruction."""
 
 from __future__ import annotations
 
+from .history import ah_name
+
 SHARP = "pinnacle"
 
 
@@ -46,7 +48,7 @@ def flags(fx):
         if lv:
             who = fx["home"] if d > 0 else fx["away"]
             out.append({"k": "ah", "lv": lv, "dir": "home" if d > 0 else "away",
-                        "t": f"亚盘：主队 {_line(o['line'])} → {_line(n['line'])}（主队净胜球预期 {o['sup']:+.2f} → "
+                        "t": f"亚盘：{ah_name(o['line'])} → {ah_name(n['line'])}（主队净胜球预期 {o['sup']:+.2f} → "
                              f"{n['sup']:+.2f}），资金流向 {who}"})
     if x2:
         o, n = x2["open"]["p"], x2["now"]["p"]

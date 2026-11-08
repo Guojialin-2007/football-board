@@ -39,6 +39,7 @@ def hist(start):
         "101": {"outcomes": {"1": {"players": series([2.30, 2.20, 2.05])}, "2": {"players": series([3.30, 3.35, 3.40])},
                              "3": {"players": series([3.20, 3.40, 3.80])}}},
         "1010": {"outcomes": {"11": {"players": series([2.10, 1.95, 1.80])}, "12": {"players": series([1.78, 1.90, 2.08])}}},
+        "1012": {"outcomes": {"13": {"players": series([2.60, 2.30, 2.02])}, "14": {"players": series([1.50, 1.62, 1.80])}}},
         "1014": {"outcomes": {"15": {"players": series([2.0, 2.0, 2.0])}, "16": {"players": series([1.8, 1.8, 1.8])}}},
         "1068": {"outcomes": {"21": {"players": series([1.95, 1.85, 1.75])}, "22": {"players": series([1.95, 2.05, 2.15])}}},
         "1070": {"outcomes": {"23": {"players": series([2.20, 2.05, 1.92])}, "24": {"players": series([1.72, 1.82, 1.96])}}}}}
@@ -59,6 +60,10 @@ class R:
 class FakeSession:
     def __init__(self):
         self.start = NOW + timedelta(hours=10)
+        self.kick = {}
+
+    def past(self, fid):
+        return self.kick[fid]
 
     def get(self, url, params=None, timeout=None):
         params = params or {}
@@ -79,13 +84,30 @@ class FakeSession:
             return R(MARKETS)
         if path == "/v4/tournaments":
             return R([{"tournamentId": 17, "tournamentName": "Premier League", "categoryName": "England"}])
+        if path == "/v4/fixtures" and params.get("statusId") == 2:
+            a = datetime.fromisoformat(params["from"].replace("Z", "+00:00"))
+            if a < NOW - timedelta(days=15):
+                return R([])
+            rng = random.Random(params["from"])
+            rows = []
+            for k in range(20):
+                st = a + timedelta(hours=7 * k + 3)
+                g = rng.randint(0, 6)
+                self.kick[f"p{params['from'][:10]}{k}"] = st
+                rows.append({"fixtureId": f"p{params['from'][:10]}{k}", "participant1Name": "Arsenal",
+                             "participant2Name": "Chelsea", "startTime": iso(st), "tournamentId": 17,
+                             "participant1Score": g // 2 + (g % 2), "participant2Score": g // 2})
+            return R(rows)
         if path == "/v4/fixtures":
             return R([{"fixtureId": "id1", "participant1Name": "Arsenal FC", "participant2Name": "Chelsea",
                        "startTime": iso(self.start), "tournamentId": 17},
                       {"fixtureId": "id2", "participant1Name": "Unknown Town", "participant2Name": "Nowhere FC",
                        "startTime": iso(self.start + timedelta(hours=2)), "tournamentId": 99}])
         if path == "/v4/historical-odds":
-            return R(hist(self.start) if params["fixtureId"] == "id1" else {"bookmakers": {}})
+            fid = params["fixtureId"]
+            if fid.startswith("p"):                       # a finished match: same moves, kickoff in the past
+                return R(hist(self.past(fid)))
+            return R(hist(self.start) if fid == "id1" else {"bookmakers": {}})
         raise AssertionError(url)
 
 
@@ -96,7 +118,7 @@ def test_board_end_to_end():
         os.environ["ODDSPAPI_KEY"] = "test-key"
         orig_papi, orig_fetch = B.Papi, T.fetch_results
         B.Papi = lambda: orig_papi(session=fs, sleep=lambda s: None)
-        B.T.fetch_results = lambda data_dir, log=print: orig_fetch(data_dir, days=40, session=fs, sleep=lambda s: None, log=log)
+        B.T.fetch_results = lambda data_dir, days=40, log=print: orig_fetch(data_dir, days=40, session=fs, sleep=lambda s: None, log=log)
         out = B.run(log=lambda *a: None)
         B.Papi, B.T.fetch_results = orig_papi, orig_fetch
         cls = O.classify(MARKETS, 10)
@@ -115,6 +137,10 @@ def test_board_end_to_end():
         assert fx["id2"]["books"] == {} and fx["id2"]["stats"]["home"]["all"] is None
         assert out["summary"]["with_odds"] == 1
         json.load(open(os.path.join(B.SITE, "data.json")))
+        h = json.load(open(os.path.join(B.SITE, "history.json")))
+        assert h["n"] >= 20 and "1" in h["ou"] and "1" in h["ah"], h        # +1 step both markets in the fake data
+        g = h["ou"]["1"]
+        assert g["follow"] is not None and g["fade"] is not None and g["open"] < g["close"]
         print(json.dumps(a["flags"], ensure_ascii=False, indent=1))
 
 
@@ -122,6 +148,17 @@ def test_same_team():
     assert T.same_team("Arsenal FC", "Arsenal") and T.same_team("Man Utd", "Manchester United")
     assert not T.same_team("Manchester United", "Manchester City") and not T.same_team("Real Madrid", "Real Sociedad")
     assert not T.same_team("Arsenal Women", "Arsenal")
+
+
+def test_asian_settlement():
+    from board import history as H
+    assert abs(H.settle_over(3, 2.5, 1.9) - 0.9) < 1e-9 and H.settle_over(2, 2.5, 1.9) == -1
+    assert H.settle_over(3, 2.75, 2.0) == 0.5                   # half win (2.5 wins, 3.0 pushes)
+    assert H.settle_under(3, 2.75, 2.0) == -0.5                 # half loss
+    assert H.settle_home(1, -0.75, 2.0) == 0.5                  # win by 1 on -0.75: half win
+    assert H.settle_away(1, -0.75, 2.0) == -0.5
+    assert H.settle_home(0, 0, 1.9) == 0                        # draw on level ball: push
+    assert H.ah_name(-0.5) == "主让半球" and H.ah_name(0.25) == "主受让平半" and H.ah_name(0) == "平手"
 
 
 def test_lambda_inverse():

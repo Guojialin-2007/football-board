@@ -16,6 +16,7 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 
+from . import history as H
 from . import odds as O
 from . import signals as S
 from . import stats as T
@@ -88,7 +89,7 @@ def odds_for(api, f, cls, books, log=print):
     return O.compact(js, cls, books)
 
 
-def card(f, comp, teams, tours, now):
+def card(f, comp, teams, tours, now, hist=None):
     start = ts(f.get("startTime"))
     tid = str(f.get("tournamentId") or "")
     tinfo = tours.get(tid, {})
@@ -106,21 +107,32 @@ def card(f, comp, teams, tours, now):
     fx["stats"] = {"home": hs, "away": as_}
     fx["exp_total"] = T.expected_total(hs["venue"], as_["venue"])
     fx["flags"] = S.flags(fx)
+    fx["hist"] = H.lookup(hist, fx)
+    for kind, label in (("ou", "大小球"), ("ah", "亚盘")):
+        h = (fx["hist"] or {}).get(kind)
+        if h and h["n"] >= 30 and h.get("fade") is not None:
+            better = "反着买" if h["fade"] > h["follow"] else "跟着买"
+            fx["flags"].append({"k": "hist", "lv": 1, "dir": kind,
+                                "t": f"历史：{label}同样{'升' if h['k'] > 0 else '降'} {abs(h['k'])} 档的 {h['n']} 场，"
+                                     f"跟着买回报 {h['follow'] * 100:+.1f}%，反着买 {h['fade'] * 100:+.1f}%（{better}更好，样本内）"})
     fx["score"] = sum(x["lv"] for x in fx["flags"])
     return fx
 
 
 def run(inspect=False, log=print):
     t0 = time.time()
+    os.makedirs(SITE, exist_ok=True)
     env = lambda k, d: os.environ.get(k) or d          # empty repository variables fall back to the default
     hours = float(env("HOURS", 36))
     max_fx = int(env("MAX_FIXTURES", 700))
-    budget = float(env("BUDGET_MIN", 200)) * 60
+    budget = float(env("BUDGET_MIN", 120)) * 60
+    hist_budget = float(env("HIST_MIN", 90)) * 60
     books = [b.strip() for b in env("BOOKS", "pinnacle,bet365,1xbet").split(",") if b.strip()][:3]
     api = Papi()
     m = meta(api, log=log)
-    T.fetch_results(DATA, log=log)
-    teams = T.Teams(T.load_results(DATA))
+    T.fetch_results(DATA, days=300, log=log)
+    teams = T.Teams(T.load_results(DATA, days=300))
+    hist = H.aggregate(DATA)
     fxs = upcoming(api, m["sid"], hours)
     log(f"[board] {len(fxs)} fixtures in the next {hours:.0f} h; fetching odds for up to {min(max_fx, len(fxs))}")
     if inspect and fxs:
@@ -137,14 +149,19 @@ def run(inspect=False, log=print):
             if inspect and i == 0:
                 log(f"[inspect] compacted odds books={list((comp or {}).keys())} "
                     f"kinds={ {b: {k: len(v) for k, v in d.items()} for b, d in (comp or {}).items()} }")
-        c = card(f, comp, teams, m.get("tours", {}), now)
+        c = card(f, comp, teams, m.get("tours", {}), now, hist)
         if not c["books"]:
             no_odds += 1
         cards.append(c)
         if (i + 1) % 50 == 0:
             log(f"[board]   {i + 1}/{min(max_fx, len(fxs))} fixtures, {(time.time() - t0) / 60:.0f} min")
     matched = sum(1 for c in cards if (c["stats"]["home"]["all"] or {}).get("n"))
-    os.makedirs(SITE, exist_ok=True)
+    try:                                   # spare time: finished matches for the "what happened before" tables
+        H.backfill(api, m["sid"], m["markets"], DATA, teams, hist_budget, log=log)
+    except Exception as e:                 # noqa: BLE001  never lose the board because of the history job
+        log(f"[history] backfill stopped: {type(e).__name__}: {str(e)[:160]}")
+    agg = H.aggregate(DATA)
+    json.dump(agg, open(os.path.join(SITE, "history.json"), "w"), ensure_ascii=False)
     out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards,
            "summary": {"fixtures": len(cards), "with_odds": len(cards) - no_odds, "with_stats": matched,
                        "flags": sum(1 for c in cards if c["flags"])}}

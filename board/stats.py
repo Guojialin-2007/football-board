@@ -58,7 +58,7 @@ def parse_board(js, lg="all"):
     return out
 
 
-def fetch_results(data_dir, days=150, recent=3, session=None, sleep=time.sleep, log=print):
+def fetch_results(data_dir, days=300, recent=3, session=None, sleep=time.sleep, log=print):
     """One cached file per day (all leagues). Re-fetches the last `recent` days every run."""
     s = session or requests.Session()
     d = os.path.join(data_dir, "results")
