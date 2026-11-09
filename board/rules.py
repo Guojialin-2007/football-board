@@ -43,8 +43,57 @@ RULES = {
     "热门被抛": ("x2", "热门胜率比开盘降 5% 以上", "爆冷信号，买冷门"),
     "平赔明显降": ("x2", "平局概率比开盘升 3% 以上", "防平"),
     "势均力敌且平赔低": ("x2", "两队胜率差 < 10% 且平局赔率 ≤ 3.00", "买平"),
+    # situations (team schedule and recent results), Asian handicap at the current line
+    "升班马赛季初": ("sit", "一方是升班马，且本赛季还没踢满 8 场", "升班马士气高，看好"),
+    "上一场爆冷赢": ("sit", "一方上一场赛前胜率不到 35% 却赢了", "状态火热，看好"),
+    "赛季首月": ("sit", "7、8 月的比赛", "主场优势"),
+    "休息天数差": ("sit", "一方距上一场 ≤ 3 天，对手 ≥ 6 天", "体能占优的一方"),
 }
 SIDES = {"ah": ("上盘", "下盘"), "ou": ("大", "小"), "x2": ("热门", "平", "冷门")}
+
+
+def _season(t):
+    d = datetime.fromtimestamp(t, tz=timezone.utc)
+    return d.year if d.month >= 7 else d.year - 1
+
+
+class Form:
+    """Walks a league's matches in date order and says which situation rules fire before each match."""
+
+    def __init__(self):
+        self.last, self.n, self.seen = {}, {}, {}
+
+    def fire(self, lg, h, a, t, recent=True):
+        """-> [(rule, {side name: 'h'|'a'})]; recent=False skips rules that need the very last match."""
+        s = _season(t)
+        out = []
+        prev = self.seen.get((lg, s - 1))
+        for team, side in ((h, "h"), (a, "a")):
+            other = "a" if side == "h" else "h"
+            if prev and team not in prev and self.n.get((team, s), 0) < 8:
+                out.append(("升班马赛季初", {"该队": side, "对手": other}))
+            lt = self.last.get(team)
+            if recent and lt and lt["season"] == s and lt["upset"]:
+                out.append(("上一场爆冷赢", {"该队": side, "对手": other}))
+        if datetime.fromtimestamp(t, tz=timezone.utc).month in (7, 8):
+            out.append(("赛季首月", {"主队": "h", "客队": "a"}))
+        lh, la = self.last.get(h), self.last.get(a)
+        if recent and lh and la:
+            rh, ra = (t - lh["t"]) / 86400, (t - la["t"]) / 86400
+            if rh <= 3.5 and ra >= 6:
+                out.append(("休息天数差", {"休息少的一方": "h", "休息足的一方": "a"}))
+            elif ra <= 3.5 and rh >= 6:
+                out.append(("休息天数差", {"休息少的一方": "a", "休息足的一方": "h"}))
+        return out
+
+    def update(self, lg, r):
+        s = _season(r["d"])
+        self.seen.setdefault((lg, s), set()).update((r["h"], r["a"]))
+        p = O.devig(r["c"]) if r.get("c") else None
+        for team, gd, pw in ((r["h"], r["hg"] - r["ag"], p[0] if p else None),
+                             (r["a"], r["ag"] - r["hg"], p[2] if p else None)):
+            self.last[team] = {"t": r["d"], "season": s, "upset": pw is not None and pw < 0.35 and gd > 0}
+            self.n[(team, s)] = self.n.get((team, s), 0) + 1
 
 
 def _pbin(p):
@@ -142,7 +191,7 @@ def _verdict(sides, base):
     bad = []
     for s, x in sides.items():
         d, v = x["dev"], x["val"]
-        if d.get("ci") and v.get("ci") and d["ci"][1] < base and v["ci"][1] < base:
+        if d.get("ci") and v.get("ci") and d["ci"][1] < 0 and v["ci"][1] < 0 and d["roi"] <= base and v["roi"] <= base:
             bad.append(f"别买{s}（两个时期都亏 {d['roi'] * 100:.0f}%、{v['roi'] * 100:.0f}%）")
     if best:
         return best[2], best[3], "；".join([best[4]] + bad)
@@ -188,24 +237,50 @@ def backtest(fd):
             rets = {"热门": pay(fav), "平": pay(1), "冷门": pay(dog)}
             for f in fs + ["_x2"]:
                 add(f, per, rets)
+    for lg, lrows in fd.rows.items():                     # situations: replay each league in date order
+        fm = Form()
+        for r in lrows:
+            if r.get("ahc") is not None and r.get("ahco"):
+                per = "dev" if r["d"] < SPLIT else "val"
+                diff = r["hg"] - r["ag"]
+                ret = {"h": H.settle_home(diff, r["ahc"], r["ahco"][0]), "a": H.settle_away(diff, r["ahc"], r["ahco"][1])}
+                for rule, sides in fm.fire(lg, r["h"], r["a"], r["d"]):
+                    add(rule, per, {nm: ret[sd] for nm, sd in sides.items()})
+            fm.update(lg, r)
     out = {"med": med, "rules": {}, "base": {}}
     for rule, sides in sorted(acc.items(), key=lambda kv: not kv[0].startswith("_")):
         st = {s: {"dev": _stat(x["dev"]), "val": _stat(x["val"]), "all": _stat(x["dev"] + x["val"])} for s, x in sides.items()}
         if rule.startswith("_"):
             out["base"][rule[1:]] = st
             continue
+        if rule not in RULES:
+            continue
         mk, what, claim = RULES[rule]
-        kind, side, text = _verdict(st, -0.03)            # "避坑" = clearly worse than the ~3% margin
+        kind, side, text = _verdict(st, -0.04)            # "避坑": both periods lose >= 4% and clearly below 0
+        if rule == "休息天数差" and kind == "有效":         # league fixtures only: cup / European games are missing
+            kind, text = "值得盯", text + "；但只算了联赛赛程（不含杯赛、欧战），休息天数可能不准"
         out["rules"][rule] = {"market": mk, "what": what, "claim": claim, "sides": st, "verdict": kind,
                               "side": side, "text": text}
     return out
 
 
-def for_match(ref, lib):
-    """Rules that fire for this match now (Pinnacle open vs now), with their backtested verdict."""
+def for_match(ref, lib, fd=None, fx=None):
+    """Rules that fire for this match now (Pinnacle open vs now, plus the teams' situation from football-data),
+    with their backtested verdict."""
     if not ref or not lib:
         return []
     hits = []
+    if fd is not None and fx and fd.rows.get(fx["league"]):
+        lrows = [r for r in fd.rows[fx["league"]] if r["d"] < fx["start"]]
+        th, ta = fd.team(fx["home"], fx["league"]), fd.team(fx["away"], fx["league"])
+        if lrows and th and ta and any(r.get("ahc") is not None for r in lrows[-50:]):
+            fm = Form()
+            for r in lrows:
+                fm.update(fx["league"], r)
+            recent = lrows[-1]["d"] >= fx["start"] - 4 * 86400   # football-data is up to date: last-match rules are safe
+            nm = {"h": "主队", "a": "客队"}
+            for rule, sides in fm.fire(fx["league"], th, ta, fx["start"], recent=recent):
+                hits.append((rule, {k: nm[v] for k, v in sides.items()}))
     x = ref.get("1x2")
     if ref.get("ah") and x:
         a = ref["ah"]

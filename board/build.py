@@ -268,7 +268,7 @@ def run(inspect=False, log=print):
     for c in cards:
         c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
         ref = (c.get("books") or {}).get("pinnacle")
-        c["detail"]["rules"] = RL.for_match(ref, lib) if lib else []
+        c["detail"]["rules"] = RL.for_match(ref, lib, fdx, c) if lib else []
         c["flags"] += move_flags(c)
         c["score"] = sum(x["lv"] for x in c["flags"])
     # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known

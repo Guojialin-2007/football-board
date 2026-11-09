@@ -3,6 +3,8 @@ none of them is a betting instruction."""
 
 from __future__ import annotations
 
+import time
+
 from .history import ah_name
 
 SHARP = "pinnacle"
@@ -113,11 +115,14 @@ def flags(fx):
             price, bk = best
             edge = price * fair - 1
             if edge >= 0.02:
-                strong = edge >= 0.04
+                hrs = (fx["start"] - time.time()) / 3600 if fx.get("start") else 0
+                early = hrs > 6                      # backtest: price gaps at the open did not pay, only near kickoff
+                strong = edge >= 0.04 and not early
                 out.append({"k": "value", "lv": 3 if strong else 1, "dir": nm, "ev": round(edge, 4), "bet": bet,
                             "book": bk, "odds": price, "mk": mk, "side": side, "line": ln,
                             "t": f"价格：{bk} {bet} 赔率 {price:.2f}，比 Pinnacle 公平价高 {edge * 100:.1f}%"
-                                 + ("（回测：高 4% 以上长期约 +3%~+5%）" if strong else "（回测：高 2%~4% 优势很小）")})
+                                 + (f"（离开赛还有 {hrs:.0f} 小时：早盘价差回测不赚钱，临近开赛再看）" if early else
+                                    "（回测：临近开赛高 4% 以上，长期约 +3%~+5%）" if strong else "（回测：高 2%~4% 优势很小）")})
     # form vs market
     et = fx.get("exp_total")
     if et and ou and ou["now"].get("lam"):
