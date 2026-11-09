@@ -21,6 +21,7 @@ from . import fd as FDM
 from . import history as H
 from . import ideas as I
 from . import learn as L
+from . import rules as RL
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -246,8 +247,20 @@ def run(inspect=False, log=print):
         log(f"[fd] {fdx.n()} matches loaded for {len(fdx.rows)} leagues")
     except Exception as e:                 # noqa: BLE001
         log(f"[fd] skipped: {type(e).__name__}: {str(e)[:160]}")
+    lib = None
+    try:                                   # 规律库: classic line-reading rules, backtested on football-data
+        if fdx is not None:
+            lib = RL.backtest(fdx)
+            json.dump({"rules": lib["rules"], "base": lib["base"]}, open(os.path.join(SITE, "rules.json"), "w"),
+                      ensure_ascii=False)
+            log(f"[rules] {sum(r['verdict'] != '没有优势' for r in lib['rules'].values())} of {len(lib['rules'])} rules "
+                f"show something")
+    except Exception as e:                 # noqa: BLE001
+        log(f"[rules] skipped: {type(e).__name__}: {str(e)[:160]}")
     for c in cards:
         c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
+        ref = (c.get("books") or {}).get("pinnacle")
+        c["detail"]["rules"] = RL.for_match(ref, lib) if lib else []
         c["flags"] += move_flags(c)
         c["score"] = sum(x["lv"] for x in c["flags"])
     # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known

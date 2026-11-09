@@ -128,6 +128,10 @@ details[open] summary::before{content:"▾ "}
 .chead{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:18px 0 2px;font-size:15px}.chead span{color:var(--muted);font-size:14px}
 .lgc{white-space:nowrap;color:var(--muted)}
 .scroll .ht{min-width:620px}.scroll .ht td,.scroll .ht th{white-space:nowrap}
+.rule{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14.5px;display:grid;gap:3px}
+.vtag{display:inline-block;font-size:12.5px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;margin-left:6px;font-weight:600}
+.vtag.sub{color:var(--muted)}
+.rt td,.rt th{text-align:left!important;vertical-align:top}.rt td:nth-child(5),.rt td:nth-child(6){white-space:nowrap}.rt td .sub{white-space:normal}
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 </style>
 </head>
@@ -143,12 +147,13 @@ details[open] summary::before{content:"▾ "}
     <span class="chip" id="onlyFlags">只看有信号</span>
     <span class="chip" id="sortScore">按信号强度排序</span>
     <span class="chip" id="histTab">历史规律</span>
+    <span class="chip" id="rulesTab">规律库</span>
     <span class="chip" id="trackTab">信号战绩</span>
     <span class="chip" id="ideasTab">思路战绩</span>
   </div>
 </div></header>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
-<main class="wrap"><div id="hist" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">数据：OddsPapi 盘口（Pinnacle 为参考）、ESPN 赛果、football-data 历史。每小时更新。只提供信息，不是投注建议。</div></main>
 <script>
 const $=s=>document.querySelector(s);
@@ -269,6 +274,20 @@ function recLine(f){
   const one=(lab,x)=>x?`${lab} ${x.n} 场，跟着买 ${R(x.roi)}${x.ci&&x.ci[0]<0&&x.ci[1]>0?"，看不出真差别":""}`:`${lab} 暂无`;
   return `<span class="rec">这类信号战绩：${one("回测",r.bt)}；${one("实盘",r.live)}</span>`;
 }
+function renderRules(x){
+  if(!x){$("#rulesPanel").innerHTML=`<h2>规律库</h2><p>还没有数据。</p>`;return}
+  const VC={"有效":"pos","值得盯":"","避坑":"neg","没有优势":"sub"},MK={ah:"亚盘",ou:"大小球",x2:"胜平负"};
+  const ord={"有效":0,"值得盯":1,"避坑":2,"没有优势":3};
+  const cell=s=>s&&s.roi!=null?`${R(s.roi)} <span class="sub">${s.n} 场</span>`:"—";
+  const ks=Object.keys(x.rules).sort((a,b)=>ord[x.rules[a].verdict]-ord[x.rules[b].verdict]);
+  $("#rulesPanel").innerHTML=`<h2>规律库：网上常见的看盘说法，经不经得起数据检验</h2>
+  <p>football-data 2019 年起约 3.2 万场（亚盘）和 6 万多场（胜平负、大小球）。2024 年 7 月以前用来发现，之后留作验证。回报用 Pinnacle 收盘赔率、亚洲盘规则结算，庄家抽水约 −2% ~ −3%。</p>
+  <div class="scroll"><table class="ht rt"><tr><th>规律</th><th>玩法</th><th>常见说法</th><th>结论</th><th>发现期</th><th>验证期</th></tr>${ks.map(k=>{const r=x.rules[k];
+    const sides=Object.entries(r.sides).map(([s,v])=>`买${s} ${cell(v.dev)}`).join("<br>"),sides2=Object.entries(r.sides).map(([s,v])=>`买${s} ${cell(v.val)}`).join("<br>");
+    return `<tr><td><b>${esc(k)}</b><div class="sub">${esc(r.what)}</div></td><td>${MK[r.market]}</td><td>${esc(r.claim||"—")}</td><td><span class="vtag ${VC[r.verdict]}">${r.verdict}</span><div class="sub" style="white-space:normal;min-width:180px">${esc(r.text)}</div></td><td>${sides}</td><td>${sides2}</td></tr>`}).join("")}</table></div>`;
+}
+$("#rulesTab").onclick=e=>{const on=$("#rulesPanel").hidden;$("#rulesPanel").hidden=!on;e.target.classList.toggle("on",on)};
+fetch("rules.json?"+Date.now()).then(r=>r.json()).then(renderRules).catch(()=>renderRules(null));
 function renderTrack(x){
   if(!x){$("#trackPanel").innerHTML=`<h2>信号战绩</h2><p>还没有数据。</p>`;return}
   const LV=x.lv_names||{};
@@ -293,12 +312,19 @@ function briefRows(list,kind){
 }
 const P=x=>x==null?"—":(x*100).toFixed(0)+"%", R=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
 function secJudge(fx){
-  const d=fx.detail||{},ref=fx.books.pinnacle||Object.values(fx.books)[0];
+  const d=fx.detail||{};
   let h="";
-
-  const CF={"低":"neg","中":"","高":"pos"};
-  if(d.judge&&d.judge.length){h+=`<div class="scroll"><table class="ht judge"><tr><th>项目</th><th>市场概率</th><th>历史同类</th><th>历史 95% 区间</th><th>样本</th><th>置信度</th><th>综合估计</th><th>差值</th></tr>${d.judge.map(j=>`<tr><td>${esc(j.what)}<span class="sub">（${j.src}）</span></td><td>${P(j.market)}</td><td>${P(j.hist)}</td><td>${j.ci?P(j.ci[0])+" ~ "+P(j.ci[1]):"—"}</td><td>${j.n}</td><td class="${CF[j.conf]}">${j.conf}</td><td><b>${P(j.est)}</b></td><td>${j.edge==null?"—":`<span class="${j.edge>0?"pos":"neg"}">${(j.edge*100).toFixed(1)}%</span>`}</td></tr>`).join("")}</table></div>`}
-  else h+=`<div class="hint">暂无盘口数据，无法判断。</div>`;
+  const VC={"有效":"pos","值得盯":"","避坑":"neg","没有优势":"sub"};
+  const rs=d.rules||[];
+  h+=`<div class="kh">本场命中的看盘规律</div>`;
+  const weak=rs.filter(r=>r.verdict==="没有优势"),strong=rs.filter(r=>r.verdict!=="没有优势");
+  h+=strong.length?strong.map(r=>`<div class="rule"><div><b>${esc(r.rule)}</b> <span class="vtag ${VC[r.verdict]}">${esc(r.verdict)}</span></div><div class="sub">${esc(r.what)}${r.claim?`　常见说法：${esc(r.claim)}`:""}</div><div>${esc(r.text)}</div></div>`).join(""):`<div class="hint">${rs.length?"命中的规律都没有优势。":"这场没有命中规律库里的规律。"}</div>`;
+  if(weak.length) h+=`<div class="hint">另外命中 ${weak.length} 条规律，回测都和抽水差不多：${weak.map(r=>esc(r.rule)).join("、")}</div>`;
+  h+=`<div class="kh">市场概率 vs 历史同类</div><div class="hint">以市场概率（Pinnacle 去水）为准：回测 2,000 多场，把历史数字混进来只会让预测更不准。历史只看是否明显偏离。</div>`;
+  const all=(d.judge||[]),js=all.filter(j=>j.n>0);
+  if(js.length){h+=`<div class="scroll"><table class="ht judge"><tr><th>项目</th><th>市场（为准）</th><th>历史同类</th><th>历史 95% 区间</th><th>样本</th><th>和市场比</th></tr>${js.map(j=>`<tr><td>${esc(j.what)}<span class="sub">（${j.src}）</span></td><td><b>${P(j.market)}</b></td><td>${P(j.hist)}</td><td>${j.ci?P(j.ci[0])+" ~ "+P(j.ci[1]):"—"}</td><td>${j.n}</td><td class="${j.vs==="和市场一致"?"sub":""}">${j.vs?esc(j.vs)+(j.n<30?"（样本少）":""):"—"}</td></tr>`).join("")}</table></div>`}
+  else h+=`<div class="hint">${all.length?"历史里还没有同类比赛。":"暂无盘口数据。"}</div>`;
+  if(js.length&&js.length<all.length) h+=`<div class="hint">历史里没有同类比赛的 ${all.length-js.length} 项没有列出。</div>`;
   return h;
 }
 function secMove(fx){
@@ -401,7 +427,9 @@ const pc0=x=>x==null?"—":(x*100).toFixed(0)+"%";
 const SECS=[
   ["chart","盘口走势",fx=>{const r=fx.books.pinnacle||Object.values(fx.books)[0];return r&&r.ou?`大小球变盘 ${r.ou.changes} 次`:"Pinnacle 开盘 → 现在"},secChart],
   ["signals","信号与战绩",fx=>fx.flags.length?`${fx.flags.length} 条信号，每类的历史回报`:"没有信号",secSignals],
-  ["judge","判断",fx=>{const j=((fx.detail||{}).judge||[]).filter(x=>x.n>=30).sort((a,b)=>Math.abs(b.edge)-Math.abs(a.edge))[0];return j?`偏差最大：${j.what} ${j.edge>0?"+":""}${(j.edge*100).toFixed(1)}%（置信度${j.conf}）`:"样本不足 30 场，参考价值低"},secJudge],
+  ["judge","判断与规律",fx=>{const d=fx.detail||{},rs=(d.rules||[]).filter(r=>r.verdict!=="没有优势");const r=fx.books.pinnacle&&fx.books.pinnacle["1x2"];
+    if(rs.length)return rs.map(r=>`${r.rule}：${r.verdict}`).join("；");
+    return r?`市场：主胜 ${pc0(r.now.p[0])} · 平 ${pc0(r.now.p[1])} · 客胜 ${pc0(r.now.p[2])}${(d.rules||[]).length?`；命中 ${(d.rules||[]).length} 条规律，都没有优势`:""}`:"暂无盘口"},secJudge],
   ["move","历史同升降",fx=>{const m=((fx.detail||{}).same_move)||{};const a=m.ah,o=m.ou;const t=[];
     if(a&&a.from!==a.to)t.push(`亚盘 ${ahN(a.from)}→${ahN(a.to)} 同联赛 ${a.n} 场${a.n?" · 主队赢盘 "+pc0(a.home_cover):""}`);
     if(o&&o.from!==o.to)t.push(`大小 ${o.from}→${o.to} 同联赛 ${o.n} 场${o.n?" · 大球 "+pc0(o.over):""}`);

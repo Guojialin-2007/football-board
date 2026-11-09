@@ -303,7 +303,9 @@ def _j(what, market, k, n, src, bet=None):
     hist = k / n if n else None
     est = round((K_SHRINK * market + n * hist) / (K_SHRINK + n), 4) if n else round(market, 4)
     return {"what": what, "market": round(market, 3), "hist": round(hist, 3) if hist is not None else None,
-            "ci": wilson(k, n), "n": round(n, 1), "est": est, "edge": round(est - market, 3), "conf": conf(n), "src": src,
+            "ci": wilson(k, n), "n": round(n, 1),
+            "vs": (None if not n else "历史明显偏高" if wilson(k, n)[0] > market else
+                   "历史明显偏低" if wilson(k, n)[1] < market else "和市场一致"), "est": est, "edge": round(est - market, 3), "conf": conf(n), "src": src,
             "bet": bet}
 
 
@@ -320,8 +322,6 @@ def judgement(ref, so, sm, h2):
         ht = (so or {}).get("home_team") or {}
         if ht.get("n"):
             out.append(_j("主胜（主队同赔）", mk[0], ht["w"], ht["n"], "同赔（本队）", (("入手主胜", od[0]), None) if od else None))
-        if h2 and h2.get("n"):
-            out.append(_j("主队赢交手", mk[0], h2["w"], h2["n"], "交手"))
     ou = (ref or {}).get("ou")
     m = (sm or {}).get("ou") or {}
     if ou:
