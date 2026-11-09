@@ -294,7 +294,8 @@ def _bin(k, cap=3):
 
 
 def group_stats(rows, kind):
-    """{step: {...}} for 'ou' (line steps of the total) or 'ah' (steps of the home handicap, + = towards home)."""
+    """{"open|close": {...}} for 'ou' (total line) or 'ah' (home handicap; k = steps, + = up / towards home).
+    Grouped by the exact opening and closing line: 2 -> 2.25 and 3 -> 3.25 are different groups."""
     g = {}
     for r in rows:
         m = r.get(kind)
@@ -302,7 +303,7 @@ def group_stats(rows, kind):
             continue
         goals, diff = r["hs"] + r["as"], r["hs"] - r["as"]
         if kind == "ou":
-            k = _bin(steps(m["ol"], m["cl"]))
+            k = steps(m["ol"], m["cl"])
             follow = (settle_over(goals, m["cl"], m["codds"][0]) if k > 0 else
                       settle_under(goals, m["cl"], m["codds"][1]) if k < 0 else None)
             fade = (settle_under(goals, m["cl"], m["codds"][1]) if k > 0 else
@@ -310,16 +311,17 @@ def group_stats(rows, kind):
             went = (goals > m["ol"]) if k > 0 else (goals < m["ol"]) if k < 0 else None
             x = {"k": k, "val": goals, "o": m.get("olam"), "c": m.get("clam"), "follow": follow, "fade": fade, "went": went}
         else:
-            k = _bin(-steps(m["ol"], m["cl"]))             # home line more negative = moved towards home = +
+            k = -steps(m["ol"], m["cl"])                   # home line more negative = moved towards home = +
             follow = (settle_home(diff, m["cl"], m["codds"][0]) if k > 0 else
                       settle_away(diff, m["cl"], m["codds"][1]) if k < 0 else None)
             fade = (settle_away(diff, m["cl"], m["codds"][1]) if k > 0 else
                     settle_home(diff, m["cl"], m["codds"][0]) if k < 0 else None)
             went = (diff + m["ol"] > 0) if k > 0 else (diff + m["ol"] < 0) if k < 0 else None
             x = {"k": k, "val": diff, "o": m.get("osup"), "c": m.get("csup"), "follow": follow, "fade": fade, "went": went}
-        g.setdefault(k, []).append(x)
+        g.setdefault((m["ol"], m["cl"]), []).append(x)
     out = {}
-    for k, xs in sorted(g.items()):
+    for (ol, cl), xs in sorted(g.items()):
+        k = xs[0]["k"]
         n = len(xs)
         def avg(key):
             v = [x[key] for x in xs if x[key] is not None]
@@ -333,7 +335,7 @@ def group_stats(rows, kind):
             mu = sum(v) / len(v)
             sd = (sum((y - mu) ** 2 for y in v) / (len(v) - 1)) ** 0.5
             return [round(mu - 1.96 * sd / len(v) ** 0.5, 3), round(mu + 1.96 * sd / len(v) ** 0.5, 3)]
-        out[k] = {"n": n, "actual": avg("val"), "open": avg("o"), "close": avg("c"),
+        out[f"{ol:g}|{cl:g}"] = {"from": ol, "to": cl, "k": k, "n": n, "actual": avg("val"), "open": avg("o"), "close": avg("c"),
                   "went": round(sum(went) / len(went), 3) if went else None,
                   "follow": round(sum(fol) / len(fol), 4) if fol else None, "follow_ci": ci(fol),
                   "fade": round(sum(fad) / len(fad), 4) if fad else None, "fade_ci": ci(fad)}

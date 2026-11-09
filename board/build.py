@@ -69,6 +69,22 @@ def meta(api, refresh_days=7, log=print):
     return m
 
 
+def upcoming_cached(api, sid, hours, every_h, log=print):
+    """/v4/fixtures counts against the monthly allowance, so fetch it every `every_h` hours (with that much extra
+    look-ahead) and reuse the cached list in between. Returns (fixtures, fetched_now)."""
+    p = os.path.join(DATA, "fixtures.json")
+    c = json.load(open(p)) if os.path.exists(p) else {}
+    now = time.time()
+    if c.get("at") and now - c["at"] < every_h * 3600 - 900 and c.get("hours", 0) >= hours + every_h - 1:
+        rows = [f for f in c["rows"] if (ts(f.get("startTime")) or 0) > now and (ts(f.get("startTime")) or 0) < now + hours * 3600]
+        log(f"[board] fixture list from cache ({(now - c['at']) / 3600:.1f} h old)")
+        return rows, False
+    rows = upcoming(api, sid, hours + every_h)
+    os.makedirs(DATA, exist_ok=True)
+    json.dump({"at": now, "hours": hours + every_h, "rows": rows}, open(p, "w"), ensure_ascii=False)
+    return [f for f in rows if (ts(f.get("startTime")) or 0) < now + hours * 3600], True
+
+
 def upcoming(api, sid, hours):
     now = datetime.now(timezone.utc)
     rows = api.get("/v4/fixtures", sportId=sid, **{"from": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -117,29 +133,45 @@ def card(f, comp, teams, tours, now, hist=None):
     fx["stats"] = {"home": hs, "away": as_}
     fx["exp_total"] = T.expected_total(hs["venue"], as_["venue"])
     fx["flags"] = S.flags(fx)
-    fx["hist"] = H.lookup(hist, fx)
-    ref = fx["books"].get("pinnacle") or next(iter(fx["books"].values()), {})
-    for kind, label in (("ou", "大小球"), ("ah", "亚盘")):
-        h = (fx["hist"] or {}).get(kind)
-        if h and h["n"] >= 30 and h.get("fade") is not None:
-            up = h["k"] > 0
-            ln = ((ref.get(kind) or {}).get("now") or {}).get("line")
-            if kind == "ou":
-                fol, fad = (f"买大 {ln:g}", f"买小 {ln:g}") if ln is not None else ("买大", "买小")
-                fol, fad = (fol, fad) if up else (fad, fol)
-                mv = f"{'升' if up else '降'} {abs(h['k'])} 档{'及以上' if abs(h['k']) >= 3 else ''}"
-            else:
-                side = (f"主队（{H.ah_name(ln)}）", "客队") if ln is not None else ("主队", "客队")
-                fol, fad = (f"买{side[0]}", f"买{side[1]}") if up else (f"买{side[1]}", f"买{side[0]}")
-                mv = f"往{'主队' if up else '客队'}方向变 {abs(h['k'])} 档{'及以上' if abs(h['k']) >= 3 else ''}"
-            ci = h.get("follow_ci")
-            sig = ("，区间跨过 0，看不出真差别" if ci and ci[0] < 0 < ci[1] else "")
-            fx["flags"].append({"k": "hist", "lv": 1, "dir": kind,
-                                "t": f"历史：{label}同样{mv}的 {h['n']} 场（本站，各联赛合计）——"
-                                     f"跟着买（{fol}，收盘赔率）平均每注 {h['follow'] * 100:+.1f}%，"
-                                     f"反着买（{fad}）{h['fade'] * 100:+.1f}%{sig}"})
     fx["score"] = sum(x["lv"] for x in fx["flags"])
     return fx
+
+
+def _ret(name, b):
+    if b.get("follow") is None:
+        return None
+    ci = b.get("follow_ci")
+    sig = "，区间跨过 0，看不出真差别" if ci and ci[0] < 0 < ci[1] else ""
+    return f"{name} {b['n']} 场：跟着买每注 {b['follow'] * 100:+.1f}%，反着买 {b['fade'] * 100:+.1f}%{sig}"
+
+
+def move_flags(c):
+    """Flags from the exact same opening -> closing line: same league first, then the same move for each team."""
+    sm = (c.get("detail") or {}).get("same_move") or {}
+    out = []
+    for kind in ("ou", "ah"):
+        b = sm.get(kind)
+        if not b or b["from"] == b["to"]:
+            continue
+        k = H.steps(b["from"], b["to"])
+        if kind == "ou":
+            up = k > 0
+            mv = f"大小球 {b['from']:g} → {b['to']:g}"
+            fol = f"买{'大' if up else '小'} {b['to']:g}"
+            fad = f"买{'小' if up else '大'} {b['to']:g}"
+        else:
+            up = -k > 0
+            mv = f"亚盘 {H.ah_name(b['from'])} → {H.ah_name(b['to'])}"
+            fol, fad = ((f"买主队（{H.ah_name(b['to'])}）", "买客队") if up else ("买客队", f"买主队（{H.ah_name(b['to'])}）"))
+        parts = [x for x in (_ret(f"同联赛（{c['league']}）", b) if b.get("n") else None,
+                             *[_ret(f"{b[key]['team']}（{'主场' if key == 'home_team' else '客场'}）", b[key])
+                               for key in ("home_team", "away_team") if (b.get(key) or {}).get("n")]) if x]
+        if not parts:
+            parts = ["同联赛、同球队还没有一模一样的变盘样本"]
+        out.append({"k": "hist", "lv": 1 if (b.get("n") or 0) >= 30 else 0, "dir": kind,
+                    "t": f"历史：{mv}（开盘→现在，一模一样的盘口）——跟着买 = {fol}，反着买 = {fad}，收盘赔率。"
+                         + "；".join(parts)})
+    return out
 
 
 def run(inspect=False, log=print):
@@ -149,14 +181,17 @@ def run(inspect=False, log=print):
     hours = float(env("HOURS", 48))
     max_fx = int(env("MAX_FIXTURES", 700))
     budget = float(env("BUDGET_MIN", 110)) * 60
-    hist_budget = float(env("HIST_MIN", 60)) * 60
+    hist_budget = float(env("HIST_MIN", 35)) * 60
     books = [b.strip() for b in env("BOOKS", "pinnacle,bet365,1xbet").split(",") if b.strip()][:3]
     api = Papi()
     m = meta(api, log=log)
     T.fetch_results(DATA, days=300, log=log)
     teams = T.Teams(T.load_results(DATA, days=300))
-    hist = H.aggregate(DATA)
-    fxs = upcoming(api, m["sid"], hours)
+    hist = None
+    fxs, full = upcoming_cached(api, m["sid"], hours, float(env("FIXTURES_EVERY_H", 6)), log=log)
+    if os.environ.get("FULL") == "1":
+        full = True
+    log(f"[board] {'full run (fixture list + history)' if full else 'quick run (odds only)'}")
     top, tmap = (None, None)
     mode = env("LEAGUES", "list")                       # list = the fixed list in board/leagues.py
     if env("ONLY_TOP", "1") == "0":
@@ -209,7 +244,9 @@ def run(inspect=False, log=print):
     except Exception as e:                 # noqa: BLE001
         log(f"[fd] skipped: {type(e).__name__}: {str(e)[:160]}")
     for c in cards:
-        c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx)
+        c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
+        c["flags"] += move_flags(c)
+        c["score"] = sum(x["lv"] for x in c["flags"])
     # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known
     seen_p = os.path.join(DATA, "seen.json")
     seen = json.load(open(seen_p)) if os.path.exists(seen_p) else {}
@@ -231,9 +268,11 @@ def run(inspect=False, log=print):
         I.run({**seen, **{c["id"]: c for c in cards}}, result_of, DATA, SITE, log=log)
     except Exception as e:                 # noqa: BLE001  never lose the board because of the ideas job
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
+    if not full:                           # quick hourly run: odds and details only, history waits for the full run
+        hist_budget = 0.0
     t_rt = time.time()
     try:                                   # older history rows: add when the line last moved
-        H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 30)) * 60, log=log)
+        H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 15)) * 60 if full else 0.0, log=log)
     except Exception as e:                 # noqa: BLE001
         log(f"[history] retime stopped: {type(e).__name__}: {str(e)[:160]}")
     hist_budget = max(0.0, hist_budget - (time.time() - t_rt))

@@ -144,8 +144,8 @@ def test_board_end_to_end():
         assert out["summary"]["with_odds"] == 1
         json.load(open(os.path.join(B.SITE, "data.json")))
         h = json.load(open(os.path.join(B.SITE, "history.json")))
-        assert h["n"] >= 20 and "1" in h["ou"] and "1" in h["ah"], h        # +1 step both markets in the fake data
-        g = h["ou"]["1"]
+        assert h["n"] >= 20 and "2.5|2.75" in h["ou"] and "-0.5|-0.75" in h["ah"], h   # exact open|close lines
+        g = h["ou"]["2.5|2.75"]
         assert g["follow"] is not None and g["fade"] is not None and g["open"] < g["close"]
         print(json.dumps(a["flags"], ensure_ascii=False, indent=1))
 

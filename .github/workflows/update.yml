@@ -2,11 +2,15 @@ name: update-board
 
 on:
   schedule:
-    - cron: "23 */6 * * *"     # every 6 hours (UTC)
+    - cron: "23 * * * *"       # every hour: odds refresh; fixture list + history every 6 h (board/build.py)
   workflow_dispatch:
     inputs:
       inspect:
         description: "print what the API returns (debug)"
+        type: boolean
+        default: false
+      full:
+        description: "full run (refresh fixture list + history) even if the cache is fresh"
         type: boolean
         default: false
 
@@ -46,6 +50,7 @@ jobs:
           RESULTS_MIN: ${{ vars.RESULTS_MIN }}
           ONLY_TOP: ${{ vars.ONLY_TOP }}
           LEAGUES: ${{ vars.LEAGUES }}
+          FULL: ${{ inputs.full && '1' || '' }}
         run: python -m board.build ${{ inputs.inspect && '--inspect' || '' }}
       - name: Save caches (results, meta, history)
         if: always()

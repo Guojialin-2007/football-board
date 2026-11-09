@@ -129,6 +129,16 @@ def same_odds(fd, league_rows, fx, ref, tol=0.08, limit=20):
     return out
 
 
+def _ci(v):
+    """95% interval of a mean return (None under 2 samples)."""
+    if len(v) < 2:
+        return None
+    mu = sum(v) / len(v)
+    sd = (sum((y - mu) ** 2 for y in v) / (len(v) - 1)) ** 0.5
+    h = 1.96 * sd / len(v) ** 0.5
+    return [round(mu - h, 3), round(mu + h, 3)]
+
+
 def _ah_block(sim_rows, ol, cl, get, limit, src):
     """sim_rows: rows with the same move; get(r) -> (goal diff, closing line, closing odds [home, away])"""
     res = {"from": ol, "to": cl, "n": len(sim_rows), "src": src}
@@ -143,7 +153,8 @@ def _ah_block(sim_rows, ol, cl, get, limit, src):
     if k and priced:
         fol = [(H.settle_home if k > 0 else H.settle_away)(get(r)[0], get(r)[1], get(r)[2][0 if k > 0 else 1]) for r in priced]
         fad = [(H.settle_away if k > 0 else H.settle_home)(get(r)[0], get(r)[1], get(r)[2][1 if k > 0 else 0]) for r in priced]
-        res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4), priced=len(priced))
+        res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4), priced=len(priced),
+                   follow_ci=_ci(fol), fade_ci=_ci(fad))
     return res
 
 
@@ -199,14 +210,18 @@ def _ou_block(sim, ol, cl, src):
                r["ou"]["codds"][0 if k > 0 else 1]) for r in sim]
         fad = [(H.settle_under if k > 0 else H.settle_over)(r["hs"] + r["as"], r["ou"]["cl"],
                r["ou"]["codds"][1 if k > 0 else 0]) for r in sim]
-        res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4))
+        res.update(follow=round(sum(fol) / len(fol), 4), fade=round(sum(fad) / len(fad), 4),
+                   follow_ci=_ci(fol), fade_ci=_ci(fad))
     return res
 
 
-def same_move(fd, league_rows, fx, ref, limit=20):
-    """Same opening -> closing line in the same league, then narrowed by the water (price) move and by when the
-    line last moved. football-data has opening/closing prices but no times, so timing uses the board's own history."""
+def same_move(fd, league_rows, fx, ref, limit=20, all_rows=None):
+    """Exactly the same opening -> closing line (2.5 -> 2.75 is not 2.75 -> 3), in the same league, then narrowed
+    by the water (price) move and by when the line last moved; plus the same move for each team (home team at home,
+    away team away, any league). football-data has opening/closing prices but no times, so timing uses the board's
+    own history."""
     out = {}
+    all_rows = all_rows if all_rows is not None else league_rows
     ah = (ref or {}).get("ah")
     if ah:
         ol, cl = ah["open"]["line"], ah["now"]["line"]
@@ -225,12 +240,24 @@ def same_move(fd, league_rows, fx, ref, limit=20):
             if w_now:
                 b["water"] = _sub(_ah_block, fdm, lambda r: water(_dp(r.get("aho"), r.get("ahco")), "主队"), w_now,
                                   ol, cl, get, src)
+            ta, tb = fd.team(fx["home"], fx["league"]), fd.team(fx["away"], fx["league"])
+            allm = [r for r in fd.all_rows() if r["d"] < fx["start"] and r.get("ah") == ol and r.get("ahc") == cl]
+            for key, nm, pick in (("home_team", ta, lambda r, t: r["h"] == t), ("away_team", tb, lambda r, t: r["a"] == t)):
+                if nm:
+                    tr = [r for r in allm if pick(r, nm)]
+                    b[key] = dict(_ah_block(tr, ol, cl, get, 0, "football-data（近 20 年，各联赛）"), team=nm,
+                                  list=[_row_fd(r) for r in sorted(tr, key=lambda r: -r["d"])[:limit]])
         else:
             src = "本站历史（2026 起）"
             b = _ah_block(own, ol, cl, get_pp, limit, src)
             b["list"] = [_row_pp(r) for r in sorted(own, key=lambda r: -r["t"])[:limit]]
             if w_now:
                 b["water"] = _sub(_ah_block, own, w_pp, w_now, ol, cl, get_pp, src)
+            allo = [r for r in all_rows if r.get("ah") and r["ah"]["ol"] == ol and r["ah"]["cl"] == cl]
+            for key, nm, side in (("home_team", fx["home"], "home"), ("away_team", fx["away"], "away")):
+                tr = [r for r in allo if r[side] == nm]
+                b[key] = dict(_ah_block(tr, ol, cl, get_pp, 0, "本站历史（2026 起，各联赛）"), team=nm,
+                              list=[_row_pp(r) for r in sorted(tr, key=lambda r: -r["t"])[:limit]])
         timed = [r for r in own if "lt" in r["ah"]]
         if t_now:
             b["timing"] = _sub(_ah_block, timed, lambda r: timing(r["ah"]["lt"]), t_now, ol, cl, get_pp,
@@ -252,6 +279,11 @@ def same_move(fd, league_rows, fx, ref, limit=20):
         sub = [r for r in sim if "lt" in r["ou"] and timing(r["ou"]["lt"]) == t_now]
         if t_now:
             res["timing"] = dict(_ou_block(sub, ol, cl, "本站历史（记录变盘时间，2026-11 起）"), cls=t_now)
+        allo = [r for r in all_rows if r.get("ou") and r["ou"]["ol"] == ol and r["ou"]["cl"] == cl]
+        for key, nm, side in (("home_team", fx["home"], "home"), ("away_team", fx["away"], "away")):
+            tr = [r for r in allo if r[side] == nm]
+            res[key] = dict(_ou_block(tr, ol, cl, "本站历史（2026 起，各联赛）"), team=nm,
+                            list=[_row_pp(r) for r in sorted(tr, key=lambda r: -r["t"])[:limit]])
         out["ou"] = res
     return out
 
@@ -284,6 +316,11 @@ def judgement(ref, so, sm, h2):
     if ou:
         n = m.get("over_k", 0) + m.get("under_k", 0)
         out.append(_j(f"大 {ou['now']['line']}", ou["now"]["p_over"], m.get("over_k", 0), n, "同升降"))
+        for key, lab in (("home_team", "同升降（主队）"), ("away_team", "同升降（客队）")):
+            sb = m.get(key)
+            if sb and sb.get("n"):
+                out.append(_j(f"大 {ou['now']['line']}（{sb['team']} 同升降）", ou["now"]["p_over"], sb.get("over_k", 0),
+                              sb.get("over_k", 0) + sb.get("under_k", 0), lab))
         for key, lab in (("water", "同升降+同水位"), ("timing", "同升降+同变盘时间")):
             sb = m.get(key)
             if sb:
@@ -294,6 +331,11 @@ def judgement(ref, so, sm, h2):
     if a:
         n = m.get("home_k", 0) + m.get("away_k", 0)
         out.append(_j(f"主队赢盘（{H.ah_name(a['now']['line'])}）", a["now"]["p_home"], m.get("home_k", 0), n, "同升降"))
+        for key, lab in (("home_team", "同升降（主队）"), ("away_team", "同升降（客队）")):
+            sb = m.get(key)
+            if sb and sb.get("n"):
+                out.append(_j(f"主队赢盘（{sb['team']} 同升降）", a["now"]["p_home"], sb.get("home_k", 0),
+                              sb.get("home_k", 0) + sb.get("away_k", 0), lab))
         for key, lab in (("water", "同升降+同水位"), ("timing", "同升降+同变盘时间")):
             sb = m.get(key)
             if sb:
@@ -302,10 +344,10 @@ def judgement(ref, so, sm, h2):
     return [j for j in out if j]
 
 
-def build(fx, teams, league_rows, fd=None):
+def build(fx, teams, league_rows, fd=None, all_rows=None):
     ref = (fx.get("books") or {}).get("pinnacle") or next(iter((fx.get("books") or {}).values()), None)
     so = same_odds(fd, league_rows, fx, ref)
-    sm = same_move(fd, league_rows, fx, ref)
+    sm = same_move(fd, league_rows, fx, ref, all_rows=all_rows)
     h2 = h2h(fd, teams, fx)
     return {"h2h": h2, "same_odds": so, "same_move": sm, "judge": judgement(ref, so, sm, h2),
             "league_n": len(league_rows)}

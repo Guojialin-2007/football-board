@@ -59,7 +59,7 @@ main{padding:16px 0 60px}
 .spark{width:88px;height:28px}
 .flags{display:flex;flex-direction:column;gap:5px}
 .flag{overflow-wrap:anywhere;font-size:12.5px;padding:6px 9px;border-radius:8px;background:color-mix(in srgb,var(--warn) 10%,transparent);border-left:3px solid var(--warn)}
-.flag.l1{border-left-color:var(--faint);background:transparent;color:var(--muted)}
+.flag.l0,.flag.l1{border-left-color:var(--faint);background:transparent;color:var(--muted)}
 .flag.l3{background:color-mix(in srgb,var(--up) 14%,transparent);border-left-color:var(--up)}
 .tbl{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
 .tbl td,.tbl th{padding:3px 4px;text-align:center}
@@ -217,19 +217,20 @@ function init(d){
   if(location.hash.length>1) openDlg(decodeURIComponent(location.hash.slice(1)));
 }
 function histTable(g,kind){
-  const keys=Object.keys(g||{}).map(Number).sort((a,b)=>a-b);
+  const keys=Object.keys(g||{}).filter(k=>g[k].n>=5&&g[k].k!==0).sort((a,b)=>(g[a].k-g[b].k)||(g[a].from-g[b].from));
   if(!keys.length) return `<p>还没有足够的历史比赛。</p>`;
-  const lab=k=>k===0?"不变":(kind==="ou"?(k>0?"升 ":"降 ")+Math.abs(k)+" 档":(k>0?"向主队 ":"向客队 ")+Math.abs(k)+" 档")+(Math.abs(k)>=3?"及以上":"");
+  const ln=x=>kind==="ou"?String(x):ahN(x);
+  const lab=key=>{const x=g[key],k=x.k;return `${ln(x.from)} → ${ln(x.to)} <span class="sub">${kind==="ou"?(k>0?"升 ":"降 "):(k>0?"向主队 ":"向客队 ")}${Math.abs(k)} 档</span>`};
   const f2=x=>x==null?"—":x.toFixed(2), pc=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
   const ci=c=>c?`<span class="sub">${(c[0]*100).toFixed(0)}~${(c[1]*100).toFixed(0)}%</span>`:"";
   const what=kind==="ou"?["平均进球","开盘预期","收盘预期","超过开盘线"]:["平均净胜球","开盘预期","收盘预期","赢开盘盘口"];
-  return `<div class="scroll"><table class="ht"><tr><th>收盘相比开盘</th><th>场数</th><th>${what[0]}</th><th>${what[1]}</th><th>${what[2]}</th><th>按变动方向${what[3]}</th><th>跟着买（收盘价）</th><th>反着买（收盘价）</th></tr>
+  return `<div class="scroll"><table class="ht"><tr><th>开盘 → 收盘</th><th>场数</th><th>${what[0]}</th><th>${what[1]}</th><th>${what[2]}</th><th>按变动方向${what[3]}</th><th>跟着买（收盘价）</th><th>反着买（收盘价）</th></tr>
   ${keys.map(k=>{const x=g[k];return `<tr><td>${lab(k)}</td><td>${x.n}</td><td>${f2(x.actual)}</td><td>${f2(x.open)}</td><td>${f2(x.close)}</td><td>${x.went==null?"—":(x.went*100).toFixed(0)+"%"}</td><td>${pc(x.follow)} ${ci(x.follow_ci)}</td><td>${pc(x.fade)} ${ci(x.fade_ci)}</td></tr>`}).join("")}</table></div>`;
 }
 function renderHist(h){
   if(!h||!h.n){$("#hist").innerHTML=`<h2>历史规律</h2><p>历史比赛还在积累中：每次自动更新都会补几百场已完赛的比赛，几天后这里就有数据。</p>`;return}
-  $("#hist").innerHTML=`<h2>历史规律：盘口升降档之后，比赛最后怎么结束</h2>
-  <p>${h.n} 场已完赛的比赛（Pinnacle 开盘 vs 收盘，${new Date(h.since*1000).toLocaleDateString("zh-CN")} 起）。"档" = 0.25 球。
+  $("#hist").innerHTML=`<h2>历史规律：盘口从开盘到收盘一模一样地变化之后，比赛最后怎么结束</h2>
+  <p>${h.n} 场已完赛的比赛（Pinnacle 开盘 vs 收盘，${new Date(h.since*1000).toLocaleDateString("zh-CN")} 起）。"档" = 0.25 球。按开盘和收盘的具体盘口分组（2→2.25 和 3→3.25 分开算），只列 5 场以上的组；这里是所有联赛合计，单场详情里的"历史同升降"只看同联赛、同球队。
   "跟着买" = 按盘口变动的方向、以收盘赔率下注；"反着买" = 认为是诱盘、反方向下注。回报按亚洲盘结算，扣了庄家抽水；括号里是 95% 区间，跨过 0 就说明看不出差别。</p>
   <h3>大小球（盘口线升降）</h3>${histTable(h.ou,"ou")}
   <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
@@ -258,13 +259,16 @@ function detailHTML(fx){
   else h+=`<div class="hint">暂无盘口数据，无法判断。</div>`;
   // same move
   const sm=d.same_move||{};
-  h+=`<h3>历史同升降（同联赛、盘口从开盘到收盘变化相同）</h3>`;
+  h+=`<h3>历史同升降（开盘→收盘的盘口一模一样：先看同联赛，再看两队各自）</h3>`;
   const subs=(a,ou)=>["water","timing"].map(k=>{const b=a[k];if(!b)return"";
     const lab=k=="water"?"再加同水位变化":"再加同变盘时间";
     const res=b.n?(ou?`<span>大球 <b>${P(b.over)}</b></span><span>小球 <b>${P(b.under)}</b></span>`:`<span>主队赢盘 <b>${P(b.home_cover)}</b></span><span>客队赢盘 <b>${P(b.away_cover)}</b></span>`)+(b.follow!=null?`<span>跟着买 ${R(b.follow)}</span><span>反着买 ${R(b.fade)}</span>`:""):`<span class="sub">暂无样本，慢慢积累</span>`;
     return `<div class="kv subkv"><span>↳ ${lab}：<b>${esc(b.cls)}</b></span><span>样本 <b>${b.n}</b> 场</span>${res}<span class="sub">${esc(b.src||"")}</span></div>`}).join("");
-  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,false)}${briefRows(a.list)}`}
-  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,true)}${briefRows(a.list)}`}
+  const teams=(a,ou)=>["home_team","away_team"].map(k=>{const b=a[k];if(!b)return"";
+    const res=b.n?(ou?`<span>大球 <b>${P(b.over)}</b></span><span>小球 <b>${P(b.under)}</b></span>`:`<span>主队赢盘 <b>${P(b.home_cover)}</b></span><span>客队赢盘 <b>${P(b.away_cover)}</b></span>`)+(b.follow!=null?`<span>跟着买 ${R(b.follow)}</span><span>反着买 ${R(b.fade)}</span>`:""):`<span class="sub">暂无一模一样的变盘</span>`;
+    return `<div class="kv subkv"><span>↳ ${esc(b.team)}（${k=="home_team"?"主场":"客场"}）同样变盘</span><span>样本 <b>${b.n}</b> 场</span>${res}<span class="sub">${esc(b.src||"")}</span></div>${b.n?briefRows(b.list):""}`}).join("");
+  if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,false)}${briefRows(a.list)}${teams(a,false)}`}
+  if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,true)}${briefRows(a.list)}${teams(a,true)}`}
   if(!sm.ah&&!sm.ou) h+=`<div class="hint">暂无盘口数据</div>`;
   // same odds
   const so=d.same_odds;
