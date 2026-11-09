@@ -170,6 +170,7 @@ class FD:
                     continue
                 for r in json.load(open(os.path.join(d, f))):
                     if r["d"] >= cut:
+                        r["lg"] = lg
                         self.rows.setdefault(lg, []).append(r)
         for v in self.rows.values():
             v.sort(key=lambda r: r["d"])

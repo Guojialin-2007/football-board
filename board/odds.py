@@ -225,7 +225,7 @@ def summarize(bd, now, kickoff, points=24):
                 v = s.get("lam") or s["line"]       # expected goals (or the line when no .5 line is priced)
             else:
                 v = s["sup"]                        # home side's expected goal difference
-            series.append([t, round(v, 4)])
+            series.append([t, round(v, 4)] + ([s["line"]] if kind in ("ou", "ah") else []))
         out[kind] = {"open_t": first[0], "open": first[1], "now": cur, "series": series,
                      "changes": len(times)}
         if kind in ("ou", "ah"):

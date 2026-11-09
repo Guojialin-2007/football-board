@@ -38,7 +38,7 @@ def _close(a, b, tol):
 
 
 def _row_fd(r, flip=False):
-    out = {"t": r["d"], "home": r["h"], "away": r["a"], "score": f"{r['hg']}-{r['ag']}"}
+    out = {"t": r["d"], "home": r["h"], "away": r["a"], "score": f"{r['hg']}-{r['ag']}", "lg": r.get("lg")}
     if r.get("o") or r.get("c"):
         out["odds"] = r.get("o") or r.get("c")
     if r.get("ah") is not None:
@@ -47,7 +47,8 @@ def _row_fd(r, flip=False):
 
 
 def _row_pp(r):
-    out = {"t": r["t"], "home": r["home"], "away": r["away"], "score": f"{r['hs']}-{r['as']}"}
+    out = {"t": r["t"], "home": r["home"], "away": r["away"], "score": f"{r['hs']}-{r['as']}",
+           "lg": r.get("lgz") or r.get("lg")}
     if r.get("x2", {}).get("oodds"):
         out["odds"] = [round(x, 2) for x in r["x2"]["oodds"]]
     if r.get("ah"):

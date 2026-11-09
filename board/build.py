@@ -20,6 +20,7 @@ from . import detail as D
 from . import fd as FDM
 from . import history as H
 from . import ideas as I
+from . import learn as L
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -235,6 +236,7 @@ def run(inspect=False, log=print):
     by_league = {}
     for r in rows:
         lg = (tmap or {}).get(str(r.get("tid") or ""))
+        r["lgz"] = lg
         if lg:
             by_league.setdefault(lg, []).append(r)
     fdx = None
@@ -271,6 +273,10 @@ def run(inspect=False, log=print):
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
     if not full:                           # quick hourly run: odds and details only, history waits for the full run
         hist_budget = 0.0
+    try:                                   # learn from right ideas, make 系统思路 for matching matches
+        L.run(cards, rows, result_of, DATA, SITE, log=log)
+    except Exception as e:                 # noqa: BLE001
+        log(f"[learn] stopped: {type(e).__name__}: {str(e)[:160]}")
     try:                                   # 信号战绩: record every signal before kickoff, settle finished matches
         TR.record(cards, DATA)
         st_tr = TR.settle_all(DATA, result_of, log=log)

@@ -122,6 +122,12 @@ details[open] summary::before{content:"▾ "}
 @media (max-width:420px){.card .spark{width:52px}}
 @media (max-width:560px){.navrow{grid-template-columns:1fr auto}.navrow .ns{grid-column:1;grid-row:2}.navrow .na{grid-row:1/3}.dteams{font-size:18px}}
 .moref{color:var(--muted);font-size:13.5px;padding:2px 4px}
+.chart{width:100%;height:auto;display:block;margin:4px 0 6px}
+.chart .cg{stroke:var(--line);stroke-width:1}.chart .ck{stroke:var(--faint);stroke-dasharray:4 4}
+.chart .ct{fill:var(--muted);font-size:12px}.chart .cm{fill:var(--text);font-size:12px;font-weight:600}.chart .cv{font-size:14px;font-weight:700}
+.chead{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;margin:18px 0 2px;font-size:15px}.chead span{color:var(--muted);font-size:14px}
+.lgc{white-space:nowrap;color:var(--muted)}
+.scroll .ht{min-width:620px}.scroll .ht td,.scroll .ht th{white-space:nowrap}
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 </style>
 </head>
@@ -252,7 +258,7 @@ function renderHist(h){
   <h3>大小球（盘口线升降）</h3>${histTable(h.ou,"ou")}
   <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
 }
-let IDEAS=null;
+let IDEAS=null,LEARN=null;
 function topFlags(fx,n){
   const fs=fx.flags.filter(f=>f.k!=="hist"),more=fx.flags.length-Math.min(n,fs.length);
   return fs.length?`<div class="flags">${fs.slice(0,n).map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("")}${more>0?`<div class="moref">还有 ${more} 条信号</div>`:""}</div>`:"";
@@ -283,7 +289,7 @@ const ahN=x=>x==null?"—":ahLine(x);
 function bigSpark(series,color){return series&&series.length>1?`<div class="spk">${spark(series,color).replace('class="spark"','class="spark" preserveAspectRatio="none"')}</div>`:""}
 function briefRows(list,kind){
   if(!list||!list.length) return "";
-  return `<div class="scroll"><table class="ht"><tr><th>日期</th><th>主</th><th>比分</th><th>客</th><th>初赔 主/平/客</th><th>亚盘 初→终</th><th>大小 初→终</th></tr>${list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td>${zi(r.home)}</td><td><b>${r.score}</b></td><td>${zi(r.away)}</td><td>${r.odds?r.odds.join(" / "):"—"}</td><td>${r.ah?ahN(r.ah[0])+" → "+ahN(r.ah[1]):"—"}</td><td>${r.ou?r.ou[0]+" → "+r.ou[1]:"—"}</td></tr>`).join("")}</table></div>`;
+  return `<div class="scroll"><table class="ht"><tr><th>日期</th><th>联赛</th><th>主</th><th>比分</th><th>客</th><th>初赔 主/平/客</th><th>亚盘 初→终</th><th>大小 初→终</th></tr>${list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td class="lgc">${esc(r.lg||"—")}</td><td>${zb(r.home)}</td><td><b>${r.score}</b></td><td>${zb(r.away)}</td><td>${r.odds?r.odds.join(" / "):"—"}</td><td>${r.ah?ahN(r.ah[0])+" → "+ahN(r.ah[1]):"—"}</td><td>${r.ou?r.ou[0]+" → "+r.ou[1]:"—"}</td></tr>`).join("")}</table></div>`;
 }
 const P=x=>x==null?"—":(x*100).toFixed(0)+"%", R=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
 function secJudge(fx){
@@ -306,7 +312,7 @@ function secMove(fx){
     return `<div class="kv subkv"><span>↳ ${lab}：<b>${esc(b.cls)}</b></span><span>样本 <b>${b.n}</b> 场</span>${res}</div>`}).join("");
   const teams=(a,ou)=>["home_team","away_team"].map(k=>{const b=a[k];if(!b)return"";
     const res=b.n?(ou?`<span>大球 <b>${P(b.over)}</b></span><span>小球 <b>${P(b.under)}</b></span>`:`<span>主队赢盘 <b>${P(b.home_cover)}</b></span><span>客队赢盘 <b>${P(b.away_cover)}</b></span>`)+(b.follow!=null?`<span>跟着买 ${R(b.follow)}</span><span>反着买 ${R(b.fade)}</span>`:""):`<span class="sub">暂无一模一样的变盘</span>`;
-    return `<div class="kv subkv"><span>↳ ${esc(b.team)}（${k=="home_team"?"主场":"客场"}）同样变盘</span><span>样本 <b>${b.n}</b> 场</span>${res}</div>${b.n?briefRows(b.list):""}`}).join("");
+    return `<div class="kv subkv"><span>↳ ${zn(b.team)}（${k=="home_team"?"主场":"客场"}）同样变盘</span><span>样本 <b>${b.n}</b> 场</span>${res}</div>${b.n?briefRows(b.list):""}`}).join("");
   if(sm.ah){const a=sm.ah;h+=`<div class="kv"><span>亚盘 <b>${ahN(a.from)} → ${ahN(a.to)}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>主队赢盘 <b>${P(a.home_cover)}</b></span><span>客队赢盘 <b>${P(a.away_cover)}</b></span><span>走水 ${P(a.push)}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,false)}${briefRows(a.list)}${teams(a,false)}`}
   if(sm.ou){const a=sm.ou;h+=`<div class="kv"><span>大小球 <b>${a.from} → ${a.to}</b></span><span>样本 <b>${a.n}</b> 场</span>${a.n?`<span>大球 <b>${P(a.over)}</b></span><span>小球 <b>${P(a.under)}</b></span><span>平均进球 ${a.avg_goals}</span>${a.follow!=null?`<span>跟着买 ${R(a.follow)}</span><span>反着买 ${R(a.fade)}</span>`:""}`:""}<span class="sub">${esc(a.src||"")}</span></div>${subs(a,true)}${briefRows(a.list)}${teams(a,true)}`}
   if(!sm.ah&&!sm.ou) h+=`<div class="hint">暂无盘口数据</div>`;
@@ -346,6 +352,10 @@ function secForm(fx){
 function secIdeas(fx){
   const d=fx.detail||{},ref=fx.books.pinnacle||Object.values(fx.books)[0];
   let h="";
+  const sy=(LEARN&&LEARN.sys||[]).filter(s=>s.match===fx.id);
+  h+=`<div class="kh">系统思路（从你做对的思路里学来的）</div>`;
+  h+=sy.length?sy.map(s=>`<div class="idea sysidea"><span class="st">${s.status==="settled"?(s.ret>0?"✅ ":"❌ ")+esc(s.word)+" "+s.score:"等待结果"}</span><b>${esc(s.market)} ${esc(s.pick)} ${s.line??""}</b> @ ${s.odds??"—"}<div>${esc(s.why)}</div></div>`).join(""):`<div class="hint">这场没有和学过的规律一样的局面。</div>`;
+  h+=`<div class="kh">你的思路</div>`;
 
   const mine=(IDEAS&&IDEAS.ideas||[]).filter(i=>i.match===fx.id);
   const url=DATA.repo?`https://github.com/${DATA.repo}/issues/new?template=idea.yml&title=${encodeURIComponent("[思路] "+fx.home+" vs "+fx.away)}&match=${encodeURIComponent(fx.id)}&game=${encodeURIComponent(fx.home+" vs "+fx.away+"（"+fmtT(fx.start)+"）")}`:"";
@@ -353,10 +363,35 @@ function secIdeas(fx){
   h+=mine.map(i=>`<div class="idea"><span class="st">${i.status==="settled"?(i.ret>0?"✅ ":"❌ ")+esc(i.word)+" "+i.score:i.status==="late"?"开赛后提交":"等待结果"}</span><b>${esc(i.market)} ${esc(i.pick)} ${i.line??""}</b> @ ${i.odds??"—"} <span class="sub">${(i.tags||[]).join("、")}</span><div>${esc(i.why||"")}</div><a class="sub" href="${i.url}" target="_blank" rel="noopener">查看</a></div>`).join("");
   return h;
 }
+function lineChart(series,color,fmt,kind,start){
+  const pts=(series||[]).filter(p=>p[1]!=null);if(pts.length<2)return `<div class="hint">变动太少，画不出走势。</div>`;
+  const W=680,H=210,L=50,Rt=58,T=16,B=34;
+  let x0=pts[0][0],x1=pts[pts.length-1][0];
+  const ko=start&&start>x1&&start-x1<3*86400?start:null; if(ko)x1=ko;
+  let y0=Math.min(...pts.map(p=>p[1])),y1=Math.max(...pts.map(p=>p[1]));const pad=(y1-y0||Math.abs(y1)*0.05||0.1)*0.15;y0-=pad;y1+=pad;
+  const sx=x=>L+(W-L-Rt)*(x1===x0?0.5:(x-x0)/(x1-x0)),sy=y=>T+(H-T-B)*(1-(y-y0)/(y1-y0));
+  let d="";pts.forEach((p,i)=>{d+=i?` H${sx(p[0]).toFixed(1)} V${sy(p[1]).toFixed(1)}`:`M${sx(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`});
+  const g=[0,0.5,1].map(f=>{const v=y0+(y1-y0)*f;return `<line x1="${L}" x2="${W-Rt}" y1="${sy(v)}" y2="${sy(v)}" class="cg"/><text x="${L-6}" y="${sy(v)+4}" class="ct" text-anchor="end">${fmt(v)}</text>`}).join("");
+  const nt=4,ticks=[...Array(nt+1)].map((_,i)=>x0+(x1-x0)*i/nt);
+  const tf=t=>{const dt=new Date(t*1000);return `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`};
+  const xt=ticks.map((t,i)=>`<text x="${sx(t)}" y="${H-10}" class="ct" text-anchor="${i===0?"start":i===nt?"end":"middle"}">${tf(t)}</text>`).join("");
+  // line changes (盘口) as labelled markers
+  let marks="";const ln=x=>kind==="ah"?ahN(x):String(x);
+  for(let i=1;i<pts.length;i++){if(pts[i][2]!=null&&pts[i-1][2]!=null&&pts[i][2]!==pts[i-1][2]){const X=sx(pts[i][0]),Y=sy(pts[i][1]);
+    marks+=`<circle cx="${X}" cy="${Y}" r="4.5" fill="${color}" stroke="var(--panel)" stroke-width="2"><title>${tf(pts[i][0])} 盘口 ${ln(pts[i-1][2])} → ${ln(pts[i][2])}</title></circle><text x="${X}" y="${Y-10}" class="cm" text-anchor="middle">${ln(pts[i][2])}</text>`}}
+  const l=pts[pts.length-1],f0=pts[0];
+  const kol=ko?`<line x1="${sx(ko)}" x2="${sx(ko)}" y1="${T}" y2="${H-B}" class="ck"/><text x="${sx(ko)}" y="${T-4}" class="ct" text-anchor="end">开赛</text>`:"";
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}${xt}${kol}<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="${sx(f0[0])}" cy="${sy(f0[1])}" r="3.5" fill="${color}"/><circle cx="${sx(l[0])}" cy="${sy(l[1])}" r="4.5" fill="${color}"/>
+  <text x="${sx(l[0])+8}" y="${sy(l[1])+5}" class="cv" fill="${color}">${fmt(l[1])}</text>${marks}</svg>`;
+}
 function secChart(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];if(!ref)return `<div class="hint">暂无盘口数据</div>`;
-  const sp=[["ou","预期进球","var(--up)"],["ah","主队净胜球预期","var(--home)"],["1x2","主胜概率","var(--good)"]].filter(([k])=>ref[k]&&ref[k].series&&ref[k].series.length>1);
-  return sp.map(([k,l,c])=>`<div class="kh">${l}</div>${bigSpark(ref[k].series,c)}`).join("")||`<div class="hint">变动太少，画不出走势。</div>`;
+  const C=[["ou","大小球：预期进球","var(--up)",v=>v.toFixed(2),r=>`盘口 ${r.open.line} → ${r.now.line}`],
+           ["ah","亚盘：主队净胜球预期","var(--home)",v=>(v>0?"+":"")+v.toFixed(2),r=>`${ahN(r.open.line)} → ${ahN(r.now.line)}`],
+           ["1x2","胜平负：主胜概率","var(--good)",v=>(v*100).toFixed(0)+"%",r=>`主胜 ${(r.open.p[0]*100).toFixed(0)}% → ${(r.now.p[0]*100).toFixed(0)}%`]];
+  return C.filter(([k])=>ref[k]).map(([k,t,c,fmt,sub])=>{const r=ref[k];
+    return `<div class="chead"><b>${t}</b><span>${sub(r)}</span><span class="sub">开盘 ${new Date(r.open_t*1000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · 变动 ${r.changes} 次</span></div>${lineChart(r.series,c,fmt,k,fx.start)}`}).join("")+`<div class="hint">圆点 = 盘口线变了（上面标的是新盘口），把鼠标放上去看时间。时间按你设备的时区显示。</div>`;
 }
 function secSignals(fx){
   if(!fx.flags.length) return `<div class="hint">这场没有信号。</div>`;
@@ -374,7 +409,8 @@ const SECS=[
   ["odds","历史同赔",fx=>{const l=(((fx.detail||{}).same_odds)||{}).league;return l&&l.n?`同联赛 ${l.n} 场：主胜 ${pc0(l.w/l.n)} · 平 ${pc0(l.d/l.n)} · 客胜 ${pc0(l.l/l.n)}`:"没有找到同赔比赛"},secOdds],
   ["h2h","历史交手",fx=>{const x=(fx.detail||{}).h2h;return x&&x.n?`${x.n} 场：${zn(fx.home)} ${x.w} 胜 ${x.d} 平 ${x.l} 负 · 场均 ${x.avg_goals} 球`:"没有交手记录"},secH2H],
   ["form","球队近况",fx=>fx.exp_total?`基本面推算本场 ${fx.exp_total.toFixed(2)} 球`:"近 10 场战绩",secForm],
-  ["ideas","思路",fx=>{const n=(IDEAS&&IDEAS.ideas||[]).filter(i=>i.match===fx.id).length;return n?`已有 ${n} 条思路`:"提交你的思路，赛后自动判对错"},secIdeas],
+  ["ideas","思路",fx=>{const n=(IDEAS&&IDEAS.ideas||[]).filter(i=>i.match===fx.id).length,sy=(LEARN&&LEARN.sys||[]).filter(s=>s.match===fx.id);
+    const t=[];if(sy.length)t.push("系统思路："+sy.map(s=>s.market+" "+s.pick).join("、"));t.push(n?`你有 ${n} 条思路`:"提交你的思路，对的会被系统学走");return t.join(" · ")},secIdeas],
 ];
 function detailHTML(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];
@@ -397,18 +433,25 @@ function closeDlg(){$("#dlg").classList.remove("on");document.body.style.overflo
 $("#dlg").onclick=e=>{if(e.target.id==="dlg")closeDlg()};
 document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;const b=document.querySelector("#dlgBox .back");b?b.click():closeDlg()});
 $("#list").addEventListener("click",e=>{if(e.target.closest("details,a"))return;const c=e.target.closest(".card");if(c)openDlg(c.dataset.id)});
+function learnHTML(){
+  const L=LEARN;if(!L)return"";
+  const rec=r=>r&&r.n?`${r.n} 次，赢 ${r.win}，每注 ${R(r.roi)}`:"还没有已结算的";
+  const st=s=>s==="使用中"?`<span class="pos">使用中</span>`:`<span class="neg">${esc(s)}</span>`;
+  return `<h3>你 vs 系统</h3><div class="kv"><span>你：<b>${rec(L.rec.user)}</b></span><span>系统：<b>${rec(L.rec.sys)}</b></span></div>
+  <h3>系统学到的规律（来自你做对的思路）</h3>${L.patterns.length?`<div class="scroll"><table class="ht"><tr><th>局面 → 怎么买</th><th>学自</th><th>历史回测</th><th>实战</th><th>状态</th></tr>${L.patterns.map(p=>`<tr><td>${esc(p.desc)}</td><td>${p.from.map(f=>`<a href="${f.url||"#"}" target="_blank" rel="noopener">${esc(f.game_zh||f.game)}</a>`).join("<br>")}</td><td>${p.bt.n?`${p.bt.n} 场 ${R(p.bt.roi)}`:"无同样局面"}</td><td>${p.live.n?`${p.live.n} 次 ${R(p.live.roi)}`:"—"}</td><td>${st(p.status)}</td></tr>`).join("")}</table></div>`:`<p>还没有。你的思路做对一次，系统就会把当时的局面记成一条规律，以后遇到同样局面自己出思路；实战连续亏或历史回测亏的规律会自动停用。</p>`}`;
+}
 function renderIdeas(x){
   IDEAS=x;
   const rec=r=>r&&r.n?`${r.n} 次 · 赢 ${r.win} · 回报 ${R(r.roi)}`:"还没有已结算的思路";
   $("#ideasPanel").innerHTML=`<h2>思路战绩</h2><p>只统计开赛前提交、已出结果的思路。回报按提交时的赔率、亚洲盘结算，每次 1 元。样本少时看个大概，几十次以上才有参考意义。</p>
   <div class="kv"><span>全部：<b>${rec(x&&x.all)}</b></span></div>
   <h3>按玩法</h3><div class="kv">${Object.entries((x&&x.market)||{}).map(([k,v])=>`<span>${k}：${rec(v)}</span>`).join("")}</div>
-  <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}`;
+  <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}${learnHTML()}`;
 }
 $("#trackTab").onclick=e=>{const on=$("#trackPanel").hidden;$("#trackPanel").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("track.json?"+Date.now()).then(r=>r.json()).then(renderTrack).catch(()=>renderTrack(null));
 $("#ideasTab").onclick=e=>{const on=$("#ideasPanel").hidden;$("#ideasPanel").hidden=!on;e.target.classList.toggle("on",on)};
-fetch("ideas.json?"+Date.now()).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
+fetch("learn.json?"+Date.now()).then(r=>r.json()).then(x=>LEARN=x).catch(()=>{}).then(()=>fetch("ideas.json?"+Date.now())).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
 $("#histTab").onclick=e=>{const on=$("#hist").hidden;$("#hist").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("history.json?"+Date.now()).then(r=>r.json()).then(renderHist).catch(()=>renderHist(null));
 $("#q").oninput=render;$("#lg").onchange=render;

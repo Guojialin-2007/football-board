@@ -148,6 +148,9 @@ def run(cards, result_of, data_dir, site_dir, gh=None, now=None, log=print):
             f.update(num=i["number"], url=i.get("html_url"), user=(i.get("user") or {}).get("login"),
                      at=_iso(i.get("created_at")), status="open",
                      start=card.get("start"), home=card.get("home"), away=card.get("away"), league=card.get("league"))
+            if card:                                     # the situation at submission, so a right idea can be learned
+                from .learn import context
+                f["ctx"] = context(card)
             if f["start"] and f["at"] and f["at"] > f["start"]:
                 f["status"] = "late"                     # submitted after kickoff: shown, never counted
             st[key] = f
