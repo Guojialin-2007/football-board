@@ -20,6 +20,7 @@ from . import detail as D
 from . import fd as FDM
 from . import history as H
 from . import ideas as I
+from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
 from . import odds as O
@@ -270,6 +271,12 @@ def run(inspect=False, log=print):
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
     if not full:                           # quick hourly run: odds and details only, history waits for the full run
         hist_budget = 0.0
+    try:                                   # 信号战绩: record every signal before kickoff, settle finished matches
+        TR.record(cards, DATA)
+        st_tr = TR.settle_all(DATA, result_of, log=log)
+        TR.attach(cards, TR.summary(st_tr, rows, SITE))
+    except Exception as e:                 # noqa: BLE001
+        log(f"[track] stopped: {type(e).__name__}: {str(e)[:160]}")
     t_rt = time.time()
     try:                                   # older history rows: add when the line last moved
         H.retime(api, m["markets"], DATA, float(env("RETIME_MIN", 15)) * 60 if full else 0.0, log=log)

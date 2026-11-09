@@ -75,6 +75,9 @@ details[open] summary::before{content:"▾ "}
 .empty{color:var(--muted);text-align:center;padding:60px 0}
 .note{color:var(--faint);font-size:12px;margin-top:30px;line-height:1.7}
 .books{font-size:11px;color:var(--faint)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
+.panel h2{font-size:15px;margin:0 0 4px}.panel p{color:var(--muted);font-size:12.5px}.panel h3{font-size:13px;margin:16px 0 6px;color:var(--muted);font-weight:500}
+.rec{display:block;font-size:11.5px;color:var(--faint);margin-top:2px}
 #ideasPanel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
 #ideasPanel h2{font-size:15px;margin:0 0 4px}#ideasPanel h3{font-size:13px;margin:16px 0 6px;color:var(--muted);font-weight:500}#ideasPanel p{color:var(--muted);font-size:12.5px}
 #hist{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:16px 0}
@@ -121,11 +124,12 @@ details[open] summary::before{content:"▾ "}
     <span class="chip" id="onlyFlags">只看有信号</span>
     <span class="chip" id="sortScore">按信号强度排序</span>
     <span class="chip" id="histTab">历史规律</span>
+    <span class="chip" id="trackTab">信号战绩</span>
     <span class="chip" id="ideasTab">思路战绩</span>
   </div>
 </div></header>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
-<main class="wrap"><div id="hist" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">
   只显示选定的联赛：英超、澳超、欧冠、西甲、意甲、德甲、法甲、美职联、墨西哥 Liga MX、欧联杯/欧协联、巴甲、英冠、沙特联、葡超、荷甲、土超、阿甲、日职 J1/J2、韩 K1/K2、德乙/法乙/西乙。<br>
   数据：盘口来自 OddsPapi（每家庄家的完整变盘记录，Pinnacle 为参考），球队近况来自 ESPN 赛果。每小时自动更新盘口（比赛列表和历史每 6 小时）。<br>
@@ -192,7 +196,7 @@ function statsBlock(fx){
 function cardHTML(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];
   const bk=Object.keys(fx.books);
-  const flags=fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("");
+  const flags=fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}${recLine(f)}</div>`).join("");
   return `<div class="card ${fx.score>=3?"hot":""}" data-id="${esc(fx.id)}">
    <div class="meta"><span class="lg">${fx.country?zi(fx.country)+" · ":""}${esc(fx.league)}</span><span>${fmtT(fx.start)}</span></div>
    <div class="teams"><div class="tm">${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
@@ -242,6 +246,28 @@ function renderHist(h){
   <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
 }
 let IDEAS=null;
+const ciTxt=c=>c?`（${(c[0]*100).toFixed(0)}~${(c[1]*100).toFixed(0)}%）`:"";
+function recLine(f){
+  const r=f.rec;if(!r)return"";
+  const one=(lab,x)=>x?`${lab} ${x.n} 场，跟着买 ${R(x.roi)}${x.ci&&x.ci[0]<0&&x.ci[1]>0?"，看不出真差别":""}`:`${lab} 暂无`;
+  return `<span class="rec">这类信号战绩：${one("回测",r.bt)}；${one("实盘",r.live)}</span>`;
+}
+function renderTrack(x){
+  if(!x){$("#trackPanel").innerHTML=`<h2>信号战绩</h2><p>还没有数据。</p>`;return}
+  const LV=x.lv_names||{};
+  const row=(lab,s)=>s&&s.n?`<tr><td>${lab}</td><td>${s.n}</td><td>${P(s.win)}</td><td>${P(s.push)}</td><td>${R(s.roi)} <span class="sub">${ciTxt(s.ci)}</span></td></tr>`:`<tr><td>${lab}</td><td>0</td><td>—</td><td>—</td><td class="sub">还没有已结算的</td></tr>`;
+  const table=(g,keys)=>`<div class="scroll"><table class="ht"><tr><th>信号</th><th>场数</th><th>赢</th><th>走水</th><th>每注回报（95% 区间）</th></tr>${keys.map(k=>{const v=g[k];if(!v)return row(esc(x.labels[k]||k),null);
+    return row(`<b>${esc(v.label)}</b>`,v.all)+Object.entries(v.lv).map(([lv,s])=>row(`<span class="sub">　↳ ${LV[lv]||("等级 "+lv)}</span>`,s)).join("")}).join("")}</table></div>`;
+  const keys=Object.keys(x.labels);
+  const btKeys=keys.filter(k=>x.bt[k]);
+  $("#trackPanel").innerHTML=`<h2>信号战绩：页面上的每条信号，照着买长期到底赚不赚</h2>
+  <p>每条信号都当成按它的方向下 1 注（大小球、亚盘按亚洲盘规则结算，扣了抽水）。"反着买"是把变盘当成诱盘、反方向下注。95% 区间同时跨过 0 的，说明看不出和"随便买"有什么差别；庄家抽水大约是 −2% ~ −5%。</p>
+  <h3>实盘：从 ${x.since?new Date(x.since*1000).toLocaleDateString("zh-CN"):"今天"} 起，开赛前最后一次看到信号时的赔率（已结算 ${x.live_matches} 场比赛）</h3>
+  ${table(x.live,keys)}
+  <h3>回测：本站已记录的 ${x.bt_matches} 场已完赛比赛（Pinnacle 开盘 vs 收盘，用收盘赔率）</h3>
+  <p>价格信号、基本面信号只能实盘记录，回测里没有。</p>
+  ${table(x.bt,btKeys)}`;
+}
 const ahN=x=>x==null?"—":ahLine(x);
 function bigSpark(series,color){return series&&series.length>1?`<div class="spk">${spark(series,color).replace('class="spark"','class="spark" preserveAspectRatio="none"')}</div>`:""}
 function briefRows(list,kind){
@@ -252,7 +278,7 @@ const P=x=>x==null?"—":(x*100).toFixed(0)+"%", R=x=>x==null?"—":`<span class
 function detailHTML(fx){
   const d=fx.detail||{},ref=fx.books.pinnacle||Object.values(fx.books)[0];
   let h=`<button class="x" onclick="closeDlg()">关闭</button><div class="sub">${fx.country?zi(fx.country)+" · ":""}${esc(fx.league)} · ${fmtT(fx.start)}</div><h2>${zn(fx.home)} vs ${zn(fx.away)}</h2><div class="sub">${esc(fx.home)} vs ${esc(fx.away)}</div>`;
-  if(fx.flags.length) h+=`<div class="flags" style="margin-top:10px">${fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("")}</div>`;
+  if(fx.flags.length) h+=`<div class="flags" style="margin-top:10px">${fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}${recLine(f)}</div>`).join("")}</div>`;
   h+=`<h3>盘口走势（Pinnacle，开盘 → 现在）</h3>`;
   if(ref){h+=[mkOU(ref.ou),mkAH(ref.ah),mk12(ref["1x2"])].map(x=>x.replace('<div class="mk">','<div class="mk big">').replace(/<svg class="spark"[\s\S]*?<\/svg>/,"")).join("");
     const sp=[["ou","预期进球","var(--up)"],["ah","主队净胜球预期","var(--home)"],["1x2","主胜概率","var(--good)"]].filter(([k])=>ref[k]&&ref[k].series&&ref[k].series.length>1);
@@ -313,6 +339,8 @@ function renderIdeas(x){
   <h3>按玩法</h3><div class="kv">${Object.entries((x&&x.market)||{}).map(([k,v])=>`<span>${k}：${rec(v)}</span>`).join("")}</div>
   <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}`;
 }
+$("#trackTab").onclick=e=>{const on=$("#trackPanel").hidden;$("#trackPanel").hidden=!on;e.target.classList.toggle("on",on)};
+fetch("track.json?"+Date.now()).then(r=>r.json()).then(renderTrack).catch(()=>renderTrack(null));
 $("#ideasTab").onclick=e=>{const on=$("#ideasPanel").hidden;$("#ideasPanel").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("ideas.json?"+Date.now()).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
 $("#histTab").onclick=e=>{const on=$("#hist").hidden;$("#hist").hidden=!on;e.target.classList.toggle("on",on)};

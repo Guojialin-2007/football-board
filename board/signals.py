@@ -70,6 +70,7 @@ def flags(fx):
                 if edge >= 0.03:
                     out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm, "ev": round(edge, 4),
                                 "bet": f"入手{nm}", "book": bk, "odds": sx["odds"][i],
+                                "mk": "1x2", "side": ("home", "draw", "away")[i], "line": None,
                                 "t": f"{bk} {nm} 赔率 {sx['odds'][i]:.2f}，比 Pinnacle 公平价高 {edge * 100:.0f}%"})
         so, ro = (d.get("ou") or {}).get("now"), (books[SHARP].get("ou") or {}).get("now")
         if so and ro and so["line"] == ro["line"]:
@@ -79,6 +80,7 @@ def flags(fx):
                 if edge >= 0.03:
                     out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm, "ev": round(edge, 4),
                                 "bet": f"买{nm} {so['line']:g}", "book": bk, "odds": so["odds"][i],
+                                "mk": "ou", "side": ("over", "under")[i], "line": so["line"],
                                 "t": f"{bk} {nm}{so['line']} 赔率 {so['odds'][i]:.2f}，比 Pinnacle 公平价高 {edge * 100:.0f}%"})
     # form vs market
     et = fx.get("exp_total")
