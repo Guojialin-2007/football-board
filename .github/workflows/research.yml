@@ -1,0 +1,23 @@
+name: research-data
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  raw:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - run: python -m board.fd_raw
+      - name: Push to the research branch
+        run: |
+          git config user.name "board-bot"
+          git config user.email "board-bot@users.noreply.github.com"
+          git checkout --orphan research
+          git rm -rq --cached .
+          git add raw
+          git commit -qm "football-data raw odds for research"
+          git push -f origin research
