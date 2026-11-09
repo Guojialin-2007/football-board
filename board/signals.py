@@ -68,7 +68,8 @@ def flags(fx):
             for i, nm in enumerate(("主胜", "平局", "客胜")):
                 edge = sx["odds"][i] * rx["p"][i] - 1
                 if edge >= 0.03:
-                    out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm,
+                    out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm, "ev": round(edge, 4),
+                                "bet": f"入手{nm}", "book": bk, "odds": sx["odds"][i],
                                 "t": f"{bk} {nm} 赔率 {sx['odds'][i]:.2f}，比 Pinnacle 公平价高 {edge * 100:.0f}%"})
         so, ro = (d.get("ou") or {}).get("now"), (books[SHARP].get("ou") or {}).get("now")
         if so and ro and so["line"] == ro["line"]:
@@ -76,7 +77,8 @@ def flags(fx):
                 fair = ro["p_over"] if i == 0 else 1 - ro["p_over"]
                 edge = so["odds"][i] * fair - 1
                 if edge >= 0.03:
-                    out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm,
+                    out.append({"k": "value", "lv": 1 if edge < 0.06 else 2, "dir": nm, "ev": round(edge, 4),
+                                "bet": f"买{nm} {so['line']:g}", "book": bk, "odds": so["odds"][i],
                                 "t": f"{bk} {nm}{so['line']} 赔率 {so['odds'][i]:.2f}，比 Pinnacle 公平价高 {edge * 100:.0f}%"})
     # form vs market
     et = fx.get("exp_total")

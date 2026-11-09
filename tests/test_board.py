@@ -258,7 +258,7 @@ def test_football_data_history():
         assert det["h2h"]["n"] == 2 and det["h2h"]["w"] == 1 and det["h2h"]["d"] == 1     # Arsenal's view
         so = det["same_odds"]
         assert so["home_team"]["n"] == 2 and so["league"]["n"] == 2                           # 10/08 and 03/03 match
-        assert det["same_move"]["ah"]["n"] == 2 and det["same_move"]["ah"]["home_k"] == 2     # -0.75: 2-1 half win, 3-0 win
+        assert det["same_move"]["ah"]["n"] == 2 and det["same_move"]["ah"]["home_k"] == 1.5   # -0.75: 2-1 half win (0.5), 3-0 win (1)
         assert all(j["conf"] == "低" for j in det["judge"]) and det["judge"][0]["ci"]
 
 
