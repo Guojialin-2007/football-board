@@ -12,10 +12,10 @@ CANDIDATES = ["bet365", "1xbet", "williamhill", "betway", "unibet", "bwin", "bet
 
 api = Papi()
 fx = json.load(open(os.path.join("data", "fixtures.json")))["rows"]
-fid = fx[0]["fixtureId"]
+fid = sorted(fx, key=lambda f: f.get("startTime", ""))[0]["fixtureId"]
 ok = []
-for i in range(0, len(CANDIDATES), 3):
-    chunk = CANDIDATES[i:i + 3]
+for i in range(0, len(CANDIDATES)):
+    chunk = CANDIDATES[i:i + 1]
     try:
         js = api.get("/v4/historical-odds", fixtureId=fid, bookmakers=",".join(chunk))
     except RuntimeError as e:
