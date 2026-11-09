@@ -115,7 +115,15 @@ def odds_for(api, f, cls, books, log=print):
             books = ["pinnacle"]
         else:
             raise
-    return O.compact(js, cls, books)
+    comp = O.compact(js, cls, books)
+    extra = [b for b in (os.environ.get("EXTRA_BOOKS") or "betano,dafabet,cloudbet").split(",") if b.strip()][:3]
+    if comp and extra:                                   # more soft books = more chances of a price above Pinnacle's fair
+        try:
+            comp.update(O.compact(api.get("/v4/historical-odds", fixtureId=fid, bookmakers=",".join(extra)), cls, extra))
+        except RuntimeError as e:
+            if " 404" not in str(e) and "NOT_FOUND" not in str(e):
+                log(f"[odds] {fid} extra books: {str(e)[:100]}")
+    return comp
 
 
 def card(f, comp, teams, tours, now, hist=None):
