@@ -205,6 +205,10 @@ details summary{font-size:13px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .nt{color:var(--text)}}
 .panel,#ideasPanel,#hist{border-radius:var(--radius)}
 .chart .cm{display:none}
+.chartbox{position:relative;touch-action:pan-y}
+.chartbox .xh{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13.5px;line-height:1.45;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.18);font-family:var(--num)}
+.tip .tt{color:var(--muted);font-size:12.5px}
 .ltrack{display:flex;height:24px;margin:-2px 0 4px;border-radius:5px;overflow:hidden;font-size:12px;font-weight:600}
 .ltrack span{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:var(--text);border-right:2px solid var(--panel)}
 .ltrack span:last-child{border-right:0}
@@ -474,6 +478,7 @@ function secIdeas(fx){
   h+=mine.map(i=>`<div class="idea"><span class="st">${i.status==="settled"?(i.ret>0?"✅ ":"❌ ")+esc(i.word)+" "+i.score:i.status==="late"?"开赛后提交":"等待结果"}</span><b>${esc(i.market)} ${esc(i.pick)} ${i.line??""}</b> @ ${i.odds??"—"} <span class="sub">${(i.tags||[]).join("、")}</span><div>${esc(i.why||"")}</div><a class="sub" href="${i.url}" target="_blank" rel="noopener">查看</a></div>`).join("");
   return h;
 }
+const CH={};let CHN=0;
 function lineChart(series,color,fmt,kind,start){
   const pts=(series||[]).filter(p=>p[1]!=null);if(pts.length<2)return `<div class="hint">变动太少，画不出走势。</div>`;
   const W=680,H=210,L=50,Rt=58,T=16,B=34;
@@ -500,17 +505,35 @@ function lineChart(series,color,fmt,kind,start){
         return `<span style="flex:${Math.max(w,0.0001)} 0 0;background:color-mix(in srgb,${color} ${shade.toFixed(0)}%,var(--panel))" title="${tf(sg.t0)} 起：${ln(sg.v)}">${w>=9?ln(sg.v):""}</span>`}).join("")}</div></div>`}}
   const l=pts[pts.length-1],f0=pts[0];
   const kol=ko?`<line x1="${sx(ko)}" x2="${sx(ko)}" y1="${T}" y2="${H-B}" class="ck"/><text x="${sx(ko)}" y="${T-4}" class="ct" text-anchor="end">开赛</text>`:"";
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}${xt}${kol}<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
+  const id="c"+(++CHN);CH[id]={pts,x0,x1,W,L,Rt,T,B,H,sx,sy,fmt,ln,tf,color};
+  return `<div class="chartbox" data-ch="${id}"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}${xt}${kol}<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
   <circle cx="${sx(f0[0])}" cy="${sy(f0[1])}" r="3.5" fill="${color}"/><circle cx="${sx(l[0])}" cy="${sy(l[1])}" r="4.5" fill="${color}"/>
-  <text x="${sx(l[0])+8}" y="${sy(l[1])+5}" class="cv" fill="${color}">${fmt(l[1])}</text>${marks}</svg>${track}`;
+  <text x="${sx(l[0])+8}" y="${sy(l[1])+5}" class="cv" fill="${color}">${fmt(l[1])}</text>${marks}<line class="xh" x1="0" x2="0" y1="${T}" y2="${H-B}" style="display:none"></line><circle class="xd" r="5" fill="${color}" stroke="var(--panel)" stroke-width="2" style="display:none"></circle></svg><div class="tip" hidden></div></div>${track}`;
 }
+function chartHover(e){
+  const box=e.target.closest&&e.target.closest(".chartbox");if(!box)return;
+  const c=CH[box.dataset.ch];if(!c)return;
+  const svg=box.querySelector("svg"),r=svg.getBoundingClientRect(),pt=e.touches?e.touches[0]:e;
+  const xv=(pt.clientX-r.left)/r.width*c.W;
+  const t=c.x0+(Math.min(Math.max(xv,c.L),c.W-c.Rt)-c.L)/(c.W-c.L-c.Rt)*(c.x1-c.x0);
+  let p=c.pts[0];for(const q of c.pts){if(q[0]<=t)p=q;else break}
+  const X=c.sx(Math.max(t,c.pts[0][0])),Y=c.sy(p[1]),xh=svg.querySelector(".xh"),xd=svg.querySelector(".xd"),tip=box.querySelector(".tip");
+  xh.setAttribute("x1",X);xh.setAttribute("x2",X);xh.style.display="";xd.setAttribute("cx",X);xd.setAttribute("cy",Y);xd.style.display="";
+  tip.innerHTML=`<div class="tt">${c.tf(p[0])} 起</div><div><b style="color:${c.color}">${c.fmt(p[1])}</b>${p[2]!=null?`　盘口 <b>${c.ln(p[2])}</b>`:""}</div>`;
+  tip.hidden=false;
+  const px=X/c.W*r.width,w=tip.offsetWidth;tip.style.left=Math.min(Math.max(px-w/2,0),r.width-w)+"px";tip.style.top=Math.max(Y/c.H*r.height-tip.offsetHeight-14,0)+"px";
+  if(e.touches)e.preventDefault();
+}
+function chartLeave(e){const box=e.target.closest&&e.target.closest(".chartbox");if(!box)return;box.querySelector(".tip").hidden=true;box.querySelectorAll(".xh,.xd").forEach(x=>x.style.display="none")}
+document.addEventListener("mousemove",chartHover);document.addEventListener("touchmove",chartHover,{passive:false});document.addEventListener("touchstart",chartHover,{passive:false});
+document.addEventListener("mouseout",e=>{if(e.target.closest&&e.target.closest(".chartbox")&&!(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest(".chartbox")))chartLeave(e)});
 function secChart(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];if(!ref)return `<div class="hint">暂无盘口数据</div>`;
   const C=[["ou","大小球：预期进球","var(--up)",v=>v.toFixed(2),r=>`盘口 ${r.open.line} → ${r.now.line}`],
            ["ah","亚盘：主队净胜球预期","var(--home)",v=>(v>0?"+":"")+v.toFixed(2),r=>`${ahN(r.open.line)} → ${ahN(r.now.line)}`],
            ["1x2","胜平负：主胜概率","var(--good)",v=>(v*100).toFixed(0)+"%",r=>`主胜 ${(r.open.p[0]*100).toFixed(0)}% → ${(r.now.p[0]*100).toFixed(0)}%`]];
   return C.filter(([k])=>ref[k]).map(([k,t,c,fmt,sub])=>{const r=ref[k];
-    return `<div class="chead"><b>${t}</b><span>${sub(r)}</span><span class="sub">开盘 ${new Date(r.open_t*1000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · 变动 ${r.changes} 次</span></div>${lineChart(r.series,c,fmt,k,fx.start)}`}).join("")+`<div class="hint">图下的色带是盘口：颜色越深盘口越高，太窄的段不写字，鼠标放上去看时间和盘口。</div>`;
+    return `<div class="chead"><b>${t}</b><span>${sub(r)}</span><span class="sub">开盘 ${new Date(r.open_t*1000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · 变动 ${r.changes} 次</span></div>${lineChart(r.series,c,fmt,k,fx.start)}`}).join("")+`<div class="hint">鼠标移到图上（手机上按住拖动）看每个时间点的数值和当时的盘口。图下的色带是盘口，颜色越深盘口越高。</div>`;
 }
 function secSignals(fx){
   if(!fx.flags.length) return `<div class="hint">这场没有信号。</div>`;
