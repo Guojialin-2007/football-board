@@ -4,16 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>赛前盘口看板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0b0f14; --panel:#121821; --panel2:#18202b; --line:#243041; --text:#e6edf3; --muted:#8b98a8; --faint:#5d6b7c;
-  --up:#ff7a59; --down:#3fb7ff; --home:#f5b942; --away:#9b8cff; --good:#38d39f; --warn:#ffcc4d;
-  --radius:14px;
+  --bg:#f2f5f2; --panel:#ffffff; --panel2:#f4f7f4; --line:#dde4de; --text:#16231c; --muted:#56645c; --faint:#8a978f;
+  --brand:#1d3552; --brand-ink:#f4f7fb;
+  --up:#cf3b2f; --down:#17864a; --home:#b57a12; --away:#5b4fc4; --good:#17864a; --warn:#b57a12;
+  --radius:12px; --num:"Barlow Semi Condensed","DIN Alternate","Roboto Condensed",system-ui,sans-serif;
 }
-@media (prefers-color-scheme: light){
-  :root:not([data-theme="dark"]){
-    --bg:#f4f6f9; --panel:#ffffff; --panel2:#f0f3f7; --line:#dde3ea; --text:#17202b; --muted:#5b6878; --faint:#8a96a5;
-    --up:#e2552f; --down:#1688d6; --home:#c98a0c; --away:#6b58e0; --good:#0f9d6e; --warn:#b98400;
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1613; --panel:#16201b; --panel2:#1c2822; --line:#2a3832; --text:#e3ebe6; --muted:#9aa9a1; --faint:#6c7b73;
+    --brand:#21395a; --brand-ink:#eef3f9;
+    --up:#ff6b5c; --down:#3fc47a; --home:#e3a73a; --away:#9d93ff; --good:#3fc47a; --warn:#e3a73a;
   }
 }
 *{box-sizing:border-box}
@@ -133,6 +137,82 @@ details[open] summary::before{content:"▾ "}
 .vtag.sub{color:var(--muted)}
 .rt td,.rt th{text-align:left!important;vertical-align:top}.rt td:nth-child(5),.rt td:nth-child(6){white-space:nowrap}.rt td .sub{white-space:normal}
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
+
+/* ---------- v2 ---------- */
+body{font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.num,.mk .v,.x3,.tbl,.ht,.kv b,.stats b,.ktime,.chart text{font-family:var(--num);font-variant-numeric:tabular-nums}
+header{background:var(--brand);color:var(--brand-ink);border-bottom:0;backdrop-filter:none}
+.top{padding:14px 0 8px}
+h1{font-size:19px;font-weight:700;letter-spacing:.5px}
+h1 span{color:color-mix(in srgb,var(--brand-ink) 65%,transparent);font-size:13px}
+.stats{color:color-mix(in srgb,var(--brand-ink) 70%,transparent)}
+.stats b{color:var(--brand-ink);font-size:18px}
+.bar{gap:8px;padding-bottom:14px}
+.bar input,.bar select{background:color-mix(in srgb,var(--brand-ink) 10%,transparent);border:1px solid color-mix(in srgb,var(--brand-ink) 22%,transparent);color:var(--brand-ink);border-radius:8px;padding:8px 12px}
+.bar input::placeholder{color:color-mix(in srgb,var(--brand-ink) 55%,transparent)}
+.bar select option{color:#16231c}
+.chip{background:transparent;border:1px solid color-mix(in srgb,var(--brand-ink) 25%,transparent);color:color-mix(in srgb,var(--brand-ink) 85%,transparent);border-radius:8px;padding:7px 13px}
+.chip:hover{border-color:color-mix(in srgb,var(--brand-ink) 55%,transparent)}
+.chip.on{background:var(--brand-ink);color:var(--brand);border-color:var(--brand-ink);font-weight:600}
+.day{font-size:15px;font-weight:700;color:var(--text);letter-spacing:0;margin:22px 2px 10px;display:flex;align-items:center;gap:10px}
+.day::after{content:"";flex:1;height:1px;background:var(--line)}
+.grid{gap:14px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.card{border-radius:var(--radius);padding:0;gap:0;overflow:hidden;box-shadow:0 1px 0 var(--line)}
+.card.hot{border-color:var(--up);box-shadow:inset 3px 0 0 var(--up)}
+.card:hover{border-color:color-mix(in srgb,var(--brand) 45%,var(--line))}
+.card>*{padding-left:14px;padding-right:14px}
+.meta{padding-top:11px;padding-bottom:9px;align-items:center;border-bottom:1px solid var(--line);font-size:13px}
+.lgtag{display:inline-flex;align-items:center;gap:6px;font-weight:650;color:var(--text);min-width:0}
+.lgtag .cty{color:var(--muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktime{font-size:17px;font-weight:700;color:var(--text);white-space:nowrap}
+.ktime small{font-size:12px;color:var(--muted);font-weight:500;margin-right:4px;font-family:inherit}
+.teams{padding-top:12px;padding-bottom:10px}
+.tm{font-size:18px;font-weight:700}
+.vs{font-family:var(--num);font-weight:600;color:var(--faint)}
+.f{width:17px;height:17px;border-radius:3px;font-size:10.5px;color:#fff}
+.f.W{background:var(--good)}.f.D{background:#9aa59f}.f.L{background:var(--up)}
+.mkt{padding-bottom:6px}
+.mk{background:transparent;border-radius:0;padding:8px 0;border-top:1px dashed var(--line);grid-template-columns:52px minmax(0,1fr) 84px}
+.mk:first-child{border-top:0}
+.mk .k{font-weight:650;color:var(--text);font-size:13.5px}
+.mk .v{gap:2px;font-size:16px}
+.row .lbl{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;min-width:48px}
+.row b{font-weight:700}
+.mk .sub{font-family:var(--num);font-size:13px}
+.arrow{color:var(--faint);margin:0 5px}
+.mv{display:inline-block;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;font-size:11.5px;font-weight:650;padding:0 6px;border-radius:4px;margin-left:8px;line-height:18px;vertical-align:1px}
+.mv.up{background:color-mix(in srgb,var(--up) 13%,transparent);color:var(--up)}
+.mv.down{background:color-mix(in srgb,var(--down) 13%,transparent);color:var(--down)}
+.flags{padding-top:8px;padding-bottom:10px;gap:6px;border-top:1px solid var(--line);background:var(--panel2)}
+.flag{font-size:13.5px;padding:7px 10px;border-radius:6px;background:var(--panel);border-left:3px solid var(--warn)}
+.flag.l0,.flag.l1{background:transparent;border-left-color:var(--line);color:var(--muted);padding-top:3px;padding-bottom:3px}
+.flag.l2{border-left-color:var(--warn)}
+.flag.l3{background:color-mix(in srgb,var(--up) 8%,var(--panel));border-left-color:var(--up);font-weight:600}
+.moref{font-size:13px;padding:0 2px}
+.card details{padding-top:9px;padding-bottom:11px;border-top:1px solid var(--line)}
+.card>.sub{padding-top:8px;padding-bottom:10px}
+details summary{font-size:13px}
+.note{border-top:1px solid var(--line);padding-top:14px}
+#dlg{background:color-mix(in srgb,#08110c 60%,transparent)}
+#dlg .box{border-radius:14px;padding:20px 22px 26px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+#dlg .x,.back{border-radius:8px}
+.dteams{font-size:23px}
+.mk.big{padding:12px 0}
+.mk.big .v{font-size:19px}
+.nav{border-radius:10px}
+.navrow:hover{background:color-mix(in srgb,var(--brand) 6%,var(--panel))}
+.nt{color:var(--brand)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .nt{color:var(--text)}}
+.panel,#ideasPanel,#hist{border-radius:var(--radius)}
+.chart .cm{display:none}
+.ltrack{display:flex;height:24px;margin:-2px 0 4px;border-radius:5px;overflow:hidden;font-size:12px;font-weight:600}
+.ltrack span{display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;color:var(--text);border-right:2px solid var(--panel)}
+.ltrack span:last-child{border-right:0}
+.ltrack-wrap{display:grid;grid-template-columns:50px 1fr 58px;align-items:center}
+.ltrack-wrap .lt{font-size:12px;color:var(--muted)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+@media (max-width:640px){.bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px}.bar::-webkit-scrollbar{display:none}.bar input{min-width:150px;flex:0 0 150px}.bar select{flex:0 0 auto}.chip{flex:0 0 auto;white-space:nowrap}.top{padding-bottom:6px}.stats{margin-left:0;width:100%}}
+@media (max-width:420px){.ktime{font-size:15px}.tm{font-size:16px}.mk{grid-template-columns:44px minmax(0,1fr) 60px}}
 </style>
 </head>
 <body>
@@ -163,6 +243,8 @@ const zb=x=>ZH[x]?`${esc(ZH[x])}<span class="en">${esc(x)}</span>`:esc(x);
 const zi=x=>ZH[x]?`${esc(ZH[x])}<span class="en il">${esc(x)}</span>`:esc(x);
 let DATA=null,onlyFlags=false,sortScore=false;
 const fmtT=t=>new Date(t*1000).toLocaleString("zh-CN", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+const hm=t=>new Date(t*1000).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false});
+const dmd=t=>{const d=new Date(t*1000);return `${d.getMonth()+1}/${d.getDate()}`};
 const dayKey=t=>new Date(t*1000).toLocaleDateString("zh-CN", {month:"long",day:"numeric",weekday:"short"});
 const pct=p=>(p*100).toFixed(0)+"%";
 const sgn=x=>(x>0?"+":"")+x;
@@ -176,20 +258,22 @@ function spark(series,color){
   const l=pts[pts.length-1];
   return `<svg class="spark" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6"/><circle cx="${sx(l[0])}" cy="${sy(l[1])}" r="2.4" fill="${color}"/></svg>`;
 }
+function badge(k,up,down){return k?`<span class="mv ${k>0?"up":"down"}">${k>0?"▲"+up:"▼"+down} ${Math.abs(k)} 档</span>`:""}
+function ahUpSteps(o,n){const fav=n<0||(n===0&&o<0)?-1:1;return Math.round((o-n)*4)*(fav<0?1:-1)}
 function dirCls(d,eps){return Math.abs(d)<eps?"":(d>0?"up":"down")}
 function mv(a,b,fmt,eps){return `${fmt(a)}<span class="arrow">→</span><b class="${dirCls(b-a,eps)}">${fmt(b)}</b>`}
 function mkOU(m){
   if(!m) return "";
   const o=m.open,n=m.now,f2=x=>x.toFixed(2),ln=x=>String(x);
   const lam=(o.lam&&n.lam)?`<div class="row"><span class="lbl">预期进球</span>${mv(o.lam,n.lam,f2,0.05)}</div>`:"";
-  return `<div class="mk"><div class="k">大小球</div><div class="v"><div class="row"><span class="lbl">盘口</span>${ln(o.line)}<span class="arrow">→</span><b>${ln(n.line)}</b></div>${lam}<div class="sub">大 ${n.odds[0].toFixed(2)} / 小 ${n.odds[1].toFixed(2)} · 变盘 ${m.changes} 次</div></div>${spark(m.series,"var(--up)")}</div>`;
+  return `<div class="mk"><div class="k">大小球</div><div class="v"><div class="row"><span class="lbl">盘口</span>${ln(o.line)}<span class="arrow">→</span><b>${ln(n.line)}</b>${badge(Math.round((n.line-o.line)*4),"升","降")}</div>${lam}<div class="sub">大 ${n.odds[0].toFixed(2)} / 小 ${n.odds[1].toFixed(2)} · 变盘 ${m.changes} 次</div></div>${spark(m.series,"var(--up)")}</div>`;
 }
 const AHN={0:"平手",0.25:"平半",0.5:"半球",0.75:"半一",1:"一球",1.25:"一球/球半",1.5:"球半",1.75:"球半/两球",2:"两球",2.25:"两球/两球半",2.5:"两球半",2.75:"两球半/三球",3:"三球"};
 function ahLine(x){if(x===0)return "平手";const n=AHN[Math.abs(x)]||Math.abs(x)+"球";return (x<0?"让":"受让")+n}
 function mkAH(m){
   if(!m) return "";
   const o=m.open,n=m.now,sg=x=>sgn(x.toFixed(2));
-  return `<div class="mk"><div class="k">亚盘</div><div class="v"><div class="row"><span class="lbl">主队</span>${ahLine(o.line)}<span class="arrow">→</span><b>${ahLine(n.line)}</b></div><div class="row"><span class="lbl">净胜球</span>${mv(o.sup,n.sup,sg,0.05)}</div><div class="sub">主 ${n.odds[0].toFixed(2)} / 客 ${n.odds[1].toFixed(2)}</div></div>${spark(m.series,"var(--home)")}</div>`;
+  return `<div class="mk"><div class="k">亚盘</div><div class="v"><div class="row"><span class="lbl">主队</span>${ahLine(o.line)}<span class="arrow">→</span><b>${ahLine(n.line)}</b>${badge(ahUpSteps(o.line,n.line),"升","降")}</div><div class="row"><span class="lbl">净胜球</span>${mv(o.sup,n.sup,sg,0.05)}</div><div class="sub">主 ${n.odds[0].toFixed(2)} / 客 ${n.odds[1].toFixed(2)}</div></div>${spark(m.series,"var(--home)")}</div>`;
 }
 function mk12(m){
   if(!m) return "";
@@ -203,7 +287,7 @@ function statsBlock(fx){
   const h=fx.stats.home,a=fx.stats.away;
   if(!(h.all&&h.all.n)&&!(a.all&&a.all.n)) return `<div class="sub">暂无球队近况（ESPN 没有这两队的数据）</div>`;
   const last=s=>s&&s.last?s.last.map(m=>`<div>${m.ha==="主"?"主":"客"} vs ${esc(m.opp)} <b>${m.score}</b></div>`).join(""):"<div>—</div>";
-  return `<details><summary>球队近况（近 10 场 / ${fx.home} 主场、${fx.away} 客场近 8 场）${fx.exp_total?`　基本面推算 ${fx.exp_total} 球`:""}</summary>
+  return `<details><summary>球队近况（近 10 场 / ${esc(zn(fx.home))} 主场、${esc(zn(fx.away))} 客场近 8 场）${fx.exp_total?`　基本面推算 ${fx.exp_total} 球`:""}</summary>
   <table class="tbl"><tr><th></th><th>${zi(fx.home)}</th><th>${zi(fx.away)}</th></tr>
   ${statRow("场均进/失",h.all,a.all,s=>`${s.gf} / ${s.ga}`)}
   ${statRow("主/客场进/失",h.venue,a.venue,s=>`${s.gf} / ${s.ga}`)}
@@ -217,9 +301,9 @@ function cardHTML(fx){
   const bk=Object.keys(fx.books);
   const flags=topFlags(fx,3);
   return `<div class="card ${fx.score>=3?"hot":""}" data-id="${esc(fx.id)}">
-   <div class="meta"><span class="lg">${fx.country?zi(fx.country)+" · ":""}${esc(fx.league)}</span><span>${fmtT(fx.start)}</span></div>
+   <div class="meta"><span class="lgtag">${esc(fx.league)}${fx.country?`<span class="cty">${esc(zn(fx.country))}</span>`:""}</span><span class="ktime"><small>${dmd(fx.start)}</small>${hm(fx.start)}</span></div>
    <div class="teams"><div class="tm">${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
-   ${ref?mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"]):`<div class="sub">暂无盘口数据</div>`}
+   ${ref?`<div class="mkt">${mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"])}</div>`:`<div class="sub">暂无盘口数据</div>`}
    ${flags}
    ${statsBlock(fx)}
   </div>`;
@@ -264,9 +348,10 @@ function renderHist(h){
   <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
 }
 let IDEAS=null,LEARN=null;
+const ft=(fx,t)=>esc(String(t).split(fx.home).join(zn(fx.home)).split(fx.away).join(zn(fx.away)));
 function topFlags(fx,n){
   const fs=fx.flags.filter(f=>f.k!=="hist"),more=fx.flags.length-Math.min(n,fs.length);
-  return fs.length?`<div class="flags">${fs.slice(0,n).map(f=>`<div class="flag l${f.lv}">${esc(f.t)}</div>`).join("")}${more>0?`<div class="moref">还有 ${more} 条信号</div>`:""}</div>`:"";
+  return fs.length?`<div class="flags">${fs.slice(0,n).map(f=>`<div class="flag l${f.lv}">${ft(fx,f.t)}</div>`).join("")}${more>0?`<div class="moref">还有 ${more} 条信号</div>`:""}</div>`:"";
 }
 const ciTxt=c=>c?`（${(c[0]*100).toFixed(0)}~${(c[1]*100).toFixed(0)}%）`:"";
 function recLine(f){
@@ -404,12 +489,20 @@ function lineChart(series,color,fmt,kind,start){
   // line changes (盘口) as labelled markers
   let marks="";const ln=x=>kind==="ah"?ahN(x):String(x);
   for(let i=1;i<pts.length;i++){if(pts[i][2]!=null&&pts[i-1][2]!=null&&pts[i][2]!==pts[i-1][2]){const X=sx(pts[i][0]),Y=sy(pts[i][1]);
-    marks+=`<circle cx="${X}" cy="${Y}" r="4.5" fill="${color}" stroke="var(--panel)" stroke-width="2"><title>${tf(pts[i][0])} 盘口 ${ln(pts[i-1][2])} → ${ln(pts[i][2])}</title></circle><text x="${X}" y="${Y-10}" class="cm" text-anchor="middle">${ln(pts[i][2])}</text>`}}
+    marks+=`<circle cx="${X}" cy="${Y}" r="3" fill="${color}" stroke="var(--panel)" stroke-width="1.5"><title>${tf(pts[i][0])} 盘口 ${ln(pts[i-1][2])} → ${ln(pts[i][2])}</title></circle>`}}
+  // the line itself as a band under the chart: one segment per line, labelled only where it fits
+  let track="";
+  if(pts.some(p=>p[2]!=null)){
+    const segs=[];pts.forEach((p,i)=>{if(p[2]==null)return;const last=segs[segs.length-1];if(last&&last.v===p[2])last.t1=pts[i+1]?pts[i+1][0]:x1;else segs.push({v:p[2],t0:p[0],t1:pts[i+1]?pts[i+1][0]:x1})});
+    if(segs.length){segs[segs.length-1].t1=x1;const vals=[...new Set(segs.map(s=>s.v))].sort((a,b)=>kind==="ah"?Math.abs(a)-Math.abs(b):a-b);
+      const tot=x1-segs[0].t0||1,pw=(W-L-Rt)/W;
+      track=`<div class="ltrack-wrap" style="grid-template-columns:${(L/W*100).toFixed(2)}% ${(pw*100).toFixed(2)}% 1fr"><span class="lt">盘口</span><div class="ltrack" style="margin-left:${((sx(segs[0].t0)-L)/(W-L-Rt)*100).toFixed(2)}%">${segs.map(sg=>{const w=(sg.t1-sg.t0)/tot*100,shade=vals.length>1?18+50*vals.indexOf(sg.v)/(vals.length-1):30;
+        return `<span style="flex:${Math.max(w,0.0001)} 0 0;background:color-mix(in srgb,${color} ${shade.toFixed(0)}%,var(--panel))" title="${tf(sg.t0)} 起：${ln(sg.v)}">${w>=9?ln(sg.v):""}</span>`}).join("")}</div></div>`}}
   const l=pts[pts.length-1],f0=pts[0];
   const kol=ko?`<line x1="${sx(ko)}" x2="${sx(ko)}" y1="${T}" y2="${H-B}" class="ck"/><text x="${sx(ko)}" y="${T-4}" class="ct" text-anchor="end">开赛</text>`:"";
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}${xt}${kol}<path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"/>
   <circle cx="${sx(f0[0])}" cy="${sy(f0[1])}" r="3.5" fill="${color}"/><circle cx="${sx(l[0])}" cy="${sy(l[1])}" r="4.5" fill="${color}"/>
-  <text x="${sx(l[0])+8}" y="${sy(l[1])+5}" class="cv" fill="${color}">${fmt(l[1])}</text>${marks}</svg>`;
+  <text x="${sx(l[0])+8}" y="${sy(l[1])+5}" class="cv" fill="${color}">${fmt(l[1])}</text>${marks}</svg>${track}`;
 }
 function secChart(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];if(!ref)return `<div class="hint">暂无盘口数据</div>`;
@@ -417,11 +510,11 @@ function secChart(fx){
            ["ah","亚盘：主队净胜球预期","var(--home)",v=>(v>0?"+":"")+v.toFixed(2),r=>`${ahN(r.open.line)} → ${ahN(r.now.line)}`],
            ["1x2","胜平负：主胜概率","var(--good)",v=>(v*100).toFixed(0)+"%",r=>`主胜 ${(r.open.p[0]*100).toFixed(0)}% → ${(r.now.p[0]*100).toFixed(0)}%`]];
   return C.filter(([k])=>ref[k]).map(([k,t,c,fmt,sub])=>{const r=ref[k];
-    return `<div class="chead"><b>${t}</b><span>${sub(r)}</span><span class="sub">开盘 ${new Date(r.open_t*1000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · 变动 ${r.changes} 次</span></div>${lineChart(r.series,c,fmt,k,fx.start)}`}).join("")+`<div class="hint">圆点 = 盘口线变了（上面标的是新盘口），把鼠标放上去看时间。时间按你设备的时区显示。</div>`;
+    return `<div class="chead"><b>${t}</b><span>${sub(r)}</span><span class="sub">开盘 ${new Date(r.open_t*1000).toLocaleString("zh-CN",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} · 变动 ${r.changes} 次</span></div>${lineChart(r.series,c,fmt,k,fx.start)}`}).join("")+`<div class="hint">图下的色带是盘口：颜色越深盘口越高，太窄的段不写字，鼠标放上去看时间和盘口。</div>`;
 }
 function secSignals(fx){
   if(!fx.flags.length) return `<div class="hint">这场没有信号。</div>`;
-  return `<div class="flags">${fx.flags.map(f=>`<div class="flag l${f.lv}">${esc(f.t)}${recLine(f)}</div>`).join("")}</div>`;
+  return `<div class="flags">${fx.flags.map(f=>`<div class="flag l${f.lv}">${ft(fx,f.t)}${recLine(f)}</div>`).join("")}</div>`;
 }
 const pc0=x=>x==null?"—":(x*100).toFixed(0)+"%";
 const SECS=[
