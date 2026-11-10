@@ -386,6 +386,8 @@ function recLine(f){
 
 /* ---------------- 竞彩计算 ---------------- */
 const JC={sel:[],odds:{},hcap:{},picks:{},tab:{},k:null,mult:1};
+try{const sv=JSON.parse(localStorage.getItem("jc-odds")||"{}");JC.odds=sv.odds||{};JC.hcap=sv.hcap||{}}catch(e){}
+const jcSave=()=>{try{localStorage.setItem("jc-odds",JSON.stringify({odds:JC.odds,hcap:JC.hcap}))}catch(e){}};
 const JCS_H=["1:0","2:0","2:1","3:0","3:1","3:2","4:0","4:1","4:2","5:0","5:1","5:2"],JCS_D=["0:0","1:1","2:2","3:3"],JCS_A=["0:1","0:2","1:2","0:3","1:3","2:3","0:4","1:4","2:4","0:5","1:5","2:5"];
 function jcOutcomes(j,h){
   const g=j.grid,t=g.flat().reduce((a,b)=>a+b,0);let W=0,D=0,L=0,rw=0,rd=0,rl=0;const tg=Array(8).fill(0),cs={};
@@ -397,42 +399,66 @@ function jcOutcomes(j,h){
 const jcFx=()=>(DATA&&DATA.fixtures||[]).filter(f=>f.jc&&f.start>Date.now()/1000);
 const evCls=e=>e==null?"":e>=0.04?"pos":e>=0?"":"neg";
 function jcKey(id,play,o){return id+"|"+play+"|"+o}
-function jcPickList(){return Object.entries(JC.picks).map(([id,k])=>{const fx=DATA.fixtures.find(f=>f.id===id);if(!fx)return null;const [_, play, o]=k.split("|");
-  const h=JC.hcap[id]??-1,p=jcOutcomes(fx.jc,h)[play][o],od=parseFloat(JC.odds[k]);return {id,fx,play,o,p,odds:od,label:`${zn(fx.home)} vs ${zn(fx.away)}：${play==="让球"?`让球(${h>0?"+":""}${h}) `:play==="胜平负"?"":play+" "}${o}`}}).filter(x=>x)}
-function comb(n,k){let r=1;for(let i=1;i<=k;i++)r=r*(n-k+i)/i;return Math.round(r)}
-function jcParlay(ps,k,mult,scale){
-  const n=ps.length,stake=2*comb(n,k)*mult,dist=[];let ev=0,pAny=0,pWin=0,pLoss=0;const byM={};
-  for(let mask=0;mask<(1<<n);mask++){
-    let pr=1;const hit=[];for(let i=0;i<n;i++){const p=Math.min(ps[i].p*scale,1);if(mask>>i&1){pr*=p;hit.push(i)}else pr*=1-p}
-    let ret=0;if(hit.length>=k){const go=(start,left,prod)=>{if(!left){ret+=2*mult*prod;return}for(let i=start;i<=hit.length-left;i++)go(i+1,left-1,prod*ps[hit[i]].odds)};go(0,k,1)}
-    ret=Math.round(ret*100)/100;const net=ret-stake;ev+=pr*net;if(ret>0)pAny+=pr;if(net>0)pWin+=pr;if(ret===0)pLoss+=pr;
-    const m=hit.length,b=byM[m]||(byM[m]={p:0,min:Infinity,max:-Infinity});b.p+=pr;b.min=Math.min(b.min,net);b.max=Math.max(b.max,net);
-  }
-  return {stake,ev,roi:ev/stake,pAny,pWin,pLoss,byM};
-}
 function jcMatchHTML(fx){
   const id=fx.id,j=fx.jc,ref=fx.books.pinnacle,defH=ref&&ref.ah&&ref.ah.now.line<0?-1:1,h=JC.hcap[id]??defH;JC.hcap[id]=h;
   const O=jcOutcomes(j,h),tab=JC.tab[id]||"胜平负";
   const tabs=["胜平负","让球","总进球","比分","半全场"].map(t=>`<button class="jtab ${t===tab?"on":""}" onclick="JC.tab['${esc(id)}']='${t}';renderJC()">${t}</button>`).join("");
-  const rows=Object.entries(O[tab]).map(([o,p])=>{const k=jcKey(id,tab,o),od=parseFloat(JC.odds[k]),ev=od>1?p*od-1:null,on=JC.picks[id]===k;
+  const rows=Object.entries(O[tab]).map(([o,p])=>{const k=jcKey(id,tab,o),od=parseFloat(JC.odds[k]),ev=od>1?p*od-1:null,on=(JC.picks[id]||[]).includes(k);
     return `<tr class="${on?"jpick":""}"><td><b>${esc(o)}</b></td><td>${(p*100).toFixed(1)}%</td><td>${p>0.0005?(1/p).toFixed(2):"—"}</td>
-    <td><input class="jodds" inputmode="decimal" placeholder="填赔率" value="${esc(JC.odds[k]||"")}" onchange="JC.odds['${esc(k)}']=this.value;renderJC()"></td>
+    <td><input class="jodds" inputmode="decimal" placeholder="填赔率" value="${esc(JC.odds[k]||"")}" onchange="JC.odds['${esc(k)}']=this.value;jcSave();renderJC()"></td>
     <td>${od>1?(100/od).toFixed(1)+"%":"—"}</td><td class="${evCls(ev)}">${ev==null?"—":(ev>=0?"+":"")+(ev*100).toFixed(1)+"%"}</td>
-    <td>${od>1?`<button class="jsel ${on?"on":""}" onclick="JC.picks['${esc(id)}']=${on?"undefined":`'${esc(k)}'`};if(!JC.picks['${esc(id)}'])delete JC.picks['${esc(id)}'];renderJC()">${on?"已选":"选"}</button>`:""}</td></tr>`}).join("");
+    <td>${od>1?`<button class="jsel ${on?"on":""}" onclick="jcPick('${esc(id)}','${esc(k)}')">${on?"已选":"选"}</button>`:""}</td></tr>`}).join("");
+  const filled=Object.keys(O[tab]).map(o=>parseFloat(JC.odds[jcKey(id,tab,o)])).filter(x=>x>1),allIn=filled.length===Object.keys(O[tab]).length;
+  const margin=allIn?filled.reduce((a,x)=>a+1/x,0):null;
+  const mline=margin?`<div class="hint">这组竞彩赔率的抽水：<b>${((1-1/margin)*100).toFixed(1)}%</b>（返奖率 ${(100/margin).toFixed(1)}%）。Pinnacle 一般只抽 2%～3%。</div>`:`<div class="hint">把这一玩法的赔率全部填上，会自动算出竞彩在这里抽多少水。</div>`;
   return `<div class="jm"><div class="jmh"><b>${zn(fx.home)} vs ${zn(fx.away)}</b><span class="sub">${esc(fx.league)} · ${fmtT(fx.start)} · Pinnacle 推算：主队进球 ${j.fit.lh.toFixed(2)}，客队 ${j.fit.la.toFixed(2)}</span>
   <button class="jx" onclick="JC.sel=JC.sel.filter(x=>x!=='${esc(id)}');delete JC.picks['${esc(id)}'];renderJC()">移除</button></div>
-  <div class="jtabs">${tabs}${tab==="让球"?`<label class="jh">竞彩让球（主队）<input inputmode="numeric" value="${h}" onchange="JC.hcap['${esc(id)}']=parseInt(this.value)||0;renderJC()"></label>`:""}</div>
-  <div class="scroll"><table class="ht jt"><tr><th>结果</th><th>概率</th><th>公平赔率</th><th>竞彩赔率</th><th>保本概率</th><th>期望收益</th><th></th></tr>${rows}</table></div></div>`;
+  <div class="jtabs">${tabs}${tab==="让球"?`<label class="jh">竞彩让球（主队）<input inputmode="numeric" value="${h}" onchange="JC.hcap['${esc(id)}']=parseInt(this.value)||0;jcSave();renderJC()"></label>`:""}</div>
+  ${mline}<div class="scroll"><table class="ht jt"><tr><th>结果</th><th>概率</th><th>公平赔率</th><th>竞彩赔率</th><th>保本概率</th><th>期望收益</th><th></th></tr>${rows}</table></div></div>`;
+}
+function jcPick(id,k){const xs=JC.picks[id]||[];JC.picks[id]=xs.includes(k)?xs.filter(x=>x!==k):xs.concat(k);if(!JC.picks[id].length)delete JC.picks[id];renderJC()}
+function jcGroups(){return Object.entries(JC.picks).map(([id,keys])=>{const fx=DATA.fixtures.find(f=>f.id===id);if(!fx||!fx.jc)return null;
+  const opts=keys.map(k=>{const [_,play,o]=k.split("|"),h=JC.hcap[id]??-1;return {play,o,h,odds:parseFloat(JC.odds[k]),p:jcOutcomes(fx.jc,h)[play][o]}}).filter(x=>x.odds>1);
+  return opts.length?{id,fx,opts,dist:jcJoint(fx,opts)}:null}).filter(x=>x)}
+const jcRes=d=>d>0?"胜":d===0?"平":"负";
+function jcHit(op,i,j,hi,hj){const d=i-j;
+  if(op.play==="胜平负")return jcRes(d)===op.o;
+  if(op.play==="让球")return "让"+jcRes(d+op.h)===op.o;
+  if(op.play==="总进球"){const t=i+j;return (t<7?String(t):"7+")===op.o}
+  if(op.play==="比分"){const k=i+":"+j;if(op.o.endsWith("其他")){const own={"胜":JCS_H,"平":JCS_D,"负":JCS_A}[op.o[0]];return op.o[0]===jcRes(d)&&!own.includes(k)}return k===op.o}
+  if(op.play==="半全场")return jcRes(hi-hj)+jcRes(d)===op.o;return false}
+function jcPois(l,n){const p=[Math.exp(-l)];for(let k=1;k<=n;k++)p.push(p[k-1]*l/k);return p}
+function jcJoint(fx,opts){
+  /* distribution over which of my picks in this match win, from one score model: the market grid, or the two
+     halves when a 半全场 pick needs the half-time score */
+  const m={},add=(mask,p)=>m[mask]=(m[mask]||0)+p;
+  if(opts.some(o=>o.play==="半全场")){const f=fx.jc.fit,sh=0.42,N=7,a=jcPois(f.lh*sh,N),b=jcPois(f.la*sh,N),c=jcPois(f.lh*(1-sh),N),d=jcPois(f.la*(1-sh),N);let t=0;
+    for(let i1=0;i1<=N;i1++)for(let j1=0;j1<=N;j1++)for(let i2=0;i2<=N;i2++)for(let j2=0;j2<=N;j2++){const p=a[i1]*b[j1]*c[i2]*d[j2];t+=p;let mask=0;opts.forEach((o,q)=>{if(jcHit(o,i1+i2,j1+j2,i1,j1))mask|=1<<q});add(mask,p)}
+    for(const k in m)m[k]/=t}
+  else{const g=fx.jc.grid,t=g.flat().reduce((x,y)=>x+y,0);g.forEach((row,i)=>row.forEach((v,j)=>{let mask=0;opts.forEach((o,q)=>{if(jcHit(o,i,j))mask|=1<<q});add(mask,v/t)}))}
+  return Object.entries(m).map(([mask,p])=>({mask:+mask,p,v:opts.reduce((s,o,q)=>s+((+mask>>q&1)?o.odds:0),0)}));
+}
+function comb(n,k){let r=1;for(let i=1;i<=k;i++)r=r*(n-k+i)/i;return Math.round(r)}
+function esym(vals,k){const e=Array(k+1).fill(0);e[0]=1;for(const v of vals)for(let j=k;j>=1;j--)e[j]+=e[j-1]*v;return e[k]}
+function jcParlay(G,k,mult,scale){
+  const n=G.length,stake=2*mult*esym(G.map(g=>g.opts.length),k),byM={};let ev=0,pAny=0,pWin=0,pLoss=0;
+  const ds=G.map(g=>{const xs=g.dist.map(s=>({...s,p:s.mask?s.p*scale:s.p}));const z=g.dist.filter(s=>s.mask).reduce((a,s)=>a+s.p,0)*(1-scale);const zero=xs.find(s=>!s.mask);if(zero)zero.p+=z;else xs.push({mask:0,p:z,v:0});return xs});
+  const go=(i,pr,vals,hits)=>{if(pr<1e-12)return;if(i===n){const ret=Math.round(2*mult*esym(vals,k)*100)/100,net=ret-stake;ev+=pr*net;if(ret>0)pAny+=pr;if(net>0)pWin+=pr;if(ret===0)pLoss+=pr;
+      const b=byM[hits]||(byM[hits]={p:0,min:Infinity,max:-Infinity});b.p+=pr;b.min=Math.min(b.min,net);b.max=Math.max(b.max,net);return}
+    for(const st of ds[i])go(i+1,pr*st.p,vals.concat(st.v),hits+(st.mask?1:0))};
+  go(0,1,[],0);
+  return {stake,ev,roi:ev/stake,pAny,pWin,pLoss,byM};
 }
 function jcParlayHTML(){
-  const ps=jcPickList();
-  if(!ps.length)return `<p>在上面每场比赛里填入竞彩赔率，点"选"，就会出现在这里。每场只能选一个结果（复式还不支持）。</p>`;
-  const n=ps.length;if(JC.kn!==n){JC.k=n;JC.kn=n}const k=Math.min(Math.max(JC.k||n,1),n);JC.k=k;
-  const R0=jcParlay(ps,k,JC.mult,1),R5=jcParlay(ps,k,JC.mult,0.95);
-  const ks=[...Array(n)].map((_,i)=>i+1).map(x=>`<option value="${x}" ${x===k?"selected":""}>${x===1?"单关（每场单买）":`${n} 场选 ${x} 关（${comb(n,x)} 注）`}</option>`).join("");
-  const mrows=Object.entries(R0.byM).sort((a,b)=>b[0]-a[0]).map(([m,b])=>`<tr><td>中 ${m} 场</td><td>${(b.p*100).toFixed(1)}%</td><td class="${b.min>0?"pos":b.min<0?"neg":""}">${b.min>=0?"+":""}${b.min.toFixed(2)}</td><td class="${b.max>0?"pos":b.max<0?"neg":""}">${b.max>=0?"+":""}${b.max.toFixed(2)}</td></tr>`).join("");
-  const bad=ps.filter(p=>p.p*p.odds-1<0).length;
-  return `<div class="jpl">${ps.map(p=>`<div>${esc(p.label)}　<span class="num">@${p.odds}</span>　概率 ${(p.p*100).toFixed(1)}%　<span class="${evCls(p.p*p.odds-1)}">${((p.p*p.odds-1)*100).toFixed(1)}%</span></div>`).join("")}</div>
+  const G=jcGroups();
+  if(!G.length)return `<p>在上面每场比赛里填入竞彩赔率，点"选"，就会出现在这里。一场可以选多个结果（复式），也可以跨玩法选（混合过关）。</p>`;
+  const n=G.length;if(JC.kn!==n){JC.k=n;JC.kn=n}const k=Math.min(Math.max(JC.k||n,1),n);JC.k=k;
+  const R0=jcParlay(G,k,JC.mult,1),R5=jcParlay(G,k,JC.mult,0.95);
+  const ks=[...Array(n)].map((_,i)=>i+1).map(x=>`<option value="${x}" ${x===k?"selected":""}>${x===1?"单关":`${n} 场选 ${x} 关`}（${esym(G.map(g=>g.opts.length),x)} 注）</option>`).join("");
+  const mrows=Object.entries(R0.byM).sort((a,b)=>b[0]-a[0]).map(([m,b])=>`<tr><td>${m} 场有命中</td><td>${(b.p*100).toFixed(1)}%</td><td class="${b.min>0?"pos":b.min<0?"neg":""}">${b.min>=0?"+":""}${b.min.toFixed(2)}</td><td class="${b.max>0?"pos":b.max<0?"neg":""}">${b.max>=0?"+":""}${b.max.toFixed(2)}</td></tr>`).join("");
+  const all=G.flatMap(g=>g.opts.map(o=>({...o,fx:g.fx}))),bad=all.filter(o=>o.p*o.odds-1<0).length;
+  const lab=(fx,o)=>`${zn(fx.home)} vs ${zn(fx.away)}：${o.play==="让球"?`让球(${o.h>0?"+":""}${o.h}) `:o.play==="胜平负"?"":o.play+" "}${o.o}`;
+  return `<div class="jpl">${all.map(o=>`<div>${esc(lab(o.fx,o))}　<span class="num">@${o.odds}</span>　概率 ${(o.p*100).toFixed(1)}%　<span class="${evCls(o.p*o.odds-1)}">${((o.p*o.odds-1)*100).toFixed(1)}%</span></div>`).join("")}</div>
   <div class="jctl"><label>过关方式 <select onchange="JC.k=parseInt(this.value);renderJC()">${ks}</select></label><label>倍数 <input inputmode="numeric" value="${JC.mult}" onchange="JC.mult=Math.max(1,parseInt(this.value)||1);renderJC()"></label></div>
   <div class="jkpi">
     <div><span>本金</span><b>${R0.stake} 元</b></div>
@@ -443,18 +469,24 @@ function jcParlayHTML(){
     <div><span>概率都高估 5% 时</span><b class="${R5.ev>=0?"pos":"neg"}">${R5.ev>=0?"+":""}${R5.ev.toFixed(2)} 元，盈利概率 ${(R5.pWin*100).toFixed(1)}%</b></div>
   </div>
   ${bad?`<div class="hint neg">有 ${bad} 个选项本身是负期望：串关不会把负期望变成正的，只会把亏损放大。</div>`:""}
-  <div class="scroll"><table class="ht"><tr><th>命中场数</th><th>概率</th><th>最少净赚</th><th>最多净赚</th></tr>${mrows}</table></div>
-  <div class="hint">按各场相互独立计算。奖金按 2 元一注 × 赔率连乘，未计单注奖金上限。</div>
-  <a class="btn" target="_blank" rel="noopener" href="${jcFreezeURL(ps,k,R0)}">冻结这张方案（提交到 GitHub，带时间戳）</a>`;
+  <div class="scroll"><table class="ht"><tr><th>有命中的场数</th><th>概率</th><th>最少净赚</th><th>最多净赚</th></tr>${mrows}</table></div>
+  <div class="hint">同一场的多个选项按同一个比分分布算联合概率（"胜"和"2:1"会一起中）；不同场之间按相互独立计算。奖金按 2 元一注 × 赔率连乘，未计单注奖金上限。</div>
+  <a class="btn" target="_blank" rel="noopener" href="${jcFreezeURL(G,k,R0)}">冻结这张方案（提交到 GitHub，带时间戳）</a>`;
 }
-function jcFreezeURL(ps,k,R){
+function jcFreezeURL(G,k,R){
   if(!DATA.repo)return "#";
-  const t=new Date().toLocaleString("zh-CN",{hour12:false});
-  const body=["赛前冻结方案（提交后不可修改，赛后按此复盘）","","生成时间："+t,"过关："+(k===1?"单关":ps.length+" 场选 "+k+" 关")+"，倍数 "+JC.mult+"，本金 "+R.stake+" 元","",
-    ...ps.map(p=>`- ${p.label} @${p.odds}｜Pinnacle 推算概率 ${(p.p*100).toFixed(1)}%｜期望 ${((p.p*p.odds-1)*100).toFixed(1)}%｜比赛 ${p.id}`),"",
+  const t=new Date().toLocaleString("zh-CN",{hour12:false}),picks=G.flatMap(g=>g.opts.map(o=>({match:g.id,home:g.fx.home,away:g.fx.away,start:g.fx.start,play:o.play,outcome:o.o,handicap:o.play==="让球"?o.h:undefined,odds:o.odds,p:+o.p.toFixed(4)})));
+  const body=["赛前冻结方案（提交后不要修改，赛后自动按此结算）","","生成时间："+t,"过关："+(k===1?"单关":G.length+" 场选 "+k+" 关")+"，倍数 "+JC.mult+"，本金 "+R.stake+" 元","",
+    ...picks.map(p=>`- ${zn(p.home)} vs ${zn(p.away)}：${p.play}${p.handicap!=null?"("+p.handicap+")":""} ${p.outcome} @${p.odds}｜Pinnacle 推算概率 ${(p.p*100).toFixed(1)}%｜期望 ${((p.p*p.odds-1)*100).toFixed(1)}%`),"",
     `至少有返奖 ${(R.pAny*100).toFixed(1)}%｜净盈利 ${(R.pWin*100).toFixed(1)}%｜全损 ${(R.pLoss*100).toFixed(1)}%｜期望净收益 ${R.ev.toFixed(2)} 元（${(R.roi*100).toFixed(1)}%）`,"",
-    "```json",JSON.stringify({k,mult:JC.mult,stake:R.stake,picks:ps.map(p=>({match:p.id,play:p.play,outcome:p.o,handicap:p.play==="让球"?JC.hcap[p.id]:undefined,odds:p.odds,p:+p.p.toFixed(4)}))}),"```"].join("\n");
+    "```json",JSON.stringify({k,mult:JC.mult,stake:R.stake,ev:+R.ev.toFixed(2),pwin:+R.pWin.toFixed(4),picks}),"```"].join("\n");
   return `https://github.com/${DATA.repo}/issues/new?title=${encodeURIComponent("[竞彩方案] "+t)}&body=${encodeURIComponent(body)}`;
+}
+function jcPlansHTML(){
+  const x=JC.plans;if(!x||!x.plans||!x.plans.length)return `<p>还没有冻结过方案。</p>`;
+  const r=x.rec,st={open:"等待赛果",settled:"已结算",void:"无法结算",bad:"格式不对"};
+  return `<div class="kv"><span>已结算 <b>${r.n}</b> 张</span><span>本金 <b>${r.stake}</b> 元</span><span>返奖 <b>${r.ret}</b> 元</span><span>净 <b class="${r.ret>=r.stake?"pos":"neg"}">${(r.ret-r.stake).toFixed(2)}</b> 元</span><span>赛前期望合计 <b>${r.exp}</b> 元</span><span>有返奖 <b>${r.any}</b> 张，净赚 <b>${r.won}</b> 张</span></div>
+  <div class="scroll"><table class="ht"><tr><th>方案</th><th>选项</th><th>本金</th><th>返奖</th><th>状态</th></tr>${x.plans.slice(0,30).map(e=>`<tr><td><a href="${e.url}" target="_blank" rel="noopener">#${e.num}</a></td><td style="white-space:normal">${((e.plan||{}).picks||[]).map(p=>`${esc(zn(p.home))} ${esc(p.play)} ${esc(p.outcome)}${p.won==null?"":p.won?" ✅":" ❌"}`).join("；")}</td><td>${e.stake??(e.plan||{}).stake??"—"}</td><td>${e.ret??"—"}</td><td>${st[e.status]||e.status}</td></tr>`).join("")}</table></div>`;
 }
 function renderJC(){
   if(!DATA)return;const fxs=jcFx();
@@ -463,8 +495,10 @@ function renderJC(){
   <p>概率由 Pinnacle 的亚盘、大小球、胜平负价格推出（同一个比分分布，五种玩法一致；在 3,000 场历史比赛上校准过）。"公平赔率" = 1 ÷ 概率。竞彩赔率要高过公平赔率才是正期望；竞彩抽水比 Pinnacle 高得多，多数时候是负的，那就别买。</p>
   <h3>1. 选比赛</h3>${fxs.length?`<div class="jchips">${chips}</div>`:`<p>现在没有带 Pinnacle 价格、尚未开赛的比赛。</p>`}
   ${JC.sel.map(id=>DATA.fixtures.find(f=>f.id===id)).filter(f=>f&&f.jc).map(jcMatchHTML).join("")}
-  <h3>2. 串关</h3>${jcParlayHTML()}`;
+  <h3>2. 串关</h3>${jcParlayHTML()}
+  <h3>3. 已冻结方案的战绩</h3>${jcPlansHTML()}`;
 }
+fetch("jcplans.json?"+Date.now()).then(r=>r.json()).then(x=>{JC.plans=x;if(!$("#jcPanel").hidden)renderJC()}).catch(()=>{});
 $("#jcTab").onclick=e=>{const on=$("#jcPanel").hidden;$("#jcPanel").hidden=!on;e.target.classList.toggle("on",on);if(on)renderJC()};
 
 function renderRules(x){

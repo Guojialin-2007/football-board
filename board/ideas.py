@@ -60,7 +60,7 @@ class GH:
         self.s.headers["Accept"] = "application/vnd.github+json"
         self.ok = bool(self.repo and tok)
 
-    def issues(self):
+    def issues(self, prefix="[思路]", label="idea"):
         out = []
         for page in range(1, 20):
             r = self.s.get(f"{API}/repos/{self.repo}/issues", params={"state": "all", "per_page": 100, "page": page},
@@ -70,8 +70,8 @@ class GH:
             out += rows
             if len(r.json()) < 100:
                 break
-        return [i for i in out if any(l.get("name") == "idea" for l in i.get("labels") or [])
-                or str(i.get("title", "")).startswith("[思路]")]
+        return [i for i in out if any(l.get("name") == label for l in i.get("labels") or [])
+                or str(i.get("title", "")).startswith(prefix)]
 
     def reply_and_close(self, num, text, label):
         self.s.post(f"{API}/repos/{self.repo}/issues/{num}/comments", json={"body": text}, timeout=30)

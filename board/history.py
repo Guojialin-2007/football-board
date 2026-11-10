@@ -148,15 +148,20 @@ def _score(f):
     return None
 
 
-def espn_score(teams, f):
+def espn_row(teams, f):
     k = ts(f.get("startTime"))
     h, a = teams.find(f.get("participant1Name") or ""), teams.find(f.get("participant2Name") or "")
     if not h or not a or not k:
         return None
     for r in teams.res:
         if abs(r["t"] - k) <= 36 * 3600 and r["home"][0] == h and r["away"][0] == a:
-            return r["hs"], r["as"]
+            return r
     return None
+
+
+def espn_score(teams, f):
+    r = espn_row(teams, f)
+    return (r["hs"], r["as"]) if r else None
 
 
 def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7, allowed=None):

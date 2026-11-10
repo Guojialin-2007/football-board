@@ -23,6 +23,7 @@ from . import ideas as I
 from . import learn as L
 from . import rules as RL
 from . import jc as JC
+from . import jcplan as JP
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -302,6 +303,19 @@ def run(inspect=False, log=print):
         I.run({**seen, **{c["id"]: c for c in cards}}, result_of, DATA, SITE, log=log)
     except Exception as e:                 # noqa: BLE001  never lose the board because of the ideas job
         log(f"[ideas] stopped: {type(e).__name__}: {str(e)[:160]}")
+    def jc_result(pk):
+        r = by_id.get(pk["match"])
+        from datetime import datetime as _dt, timezone as _tz
+        f = {"participant1Name": pk.get("home"), "participant2Name": pk.get("away"),
+             "startTime": _dt.fromtimestamp(pk.get("start") or 0, _tz.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")}
+        e = H.espn_row(teams, f)
+        if e:
+            return e
+        return {"hs": r["hs"], "as": r["as"]} if r else None
+    try:
+        JP.run(jc_result, DATA, SITE, log=log)
+    except Exception as e:                 # noqa: BLE001
+        log(f"[jcplan] stopped: {type(e).__name__}: {str(e)[:160]}")
     if not full:                           # quick hourly run: odds and details only, history waits for the full run
         hist_budget = 0.0
     try:                                   # learn from right ideas, make 系统思路 for matching matches

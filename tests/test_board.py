@@ -288,5 +288,19 @@ def test_jc_model():
     print("PASS test_jc_model")
 
 
+
+def test_jc_plan_settlement():
+    from board import jcplan as JP
+    plan = {"k": 2, "mult": 1, "picks": [
+        {"match": "a", "play": "胜平负", "outcome": "胜", "odds": 2.0}, {"match": "a", "play": "胜平负", "outcome": "平", "odds": 3.2},
+        {"match": "b", "play": "比分", "outcome": "胜其他", "odds": 30}, {"match": "c", "play": "半全场", "outcome": "平胜", "odds": 4.5}]}
+    assert JP.hit(plan["picks"][2], 6, 1) and not JP.hit(plan["picks"][2], 2, 1)
+    assert JP.hit(plan["picks"][3], 2, 1, 0, 0) and JP.hit(plan["picks"][3], 2, 1) is None   # needs the half-time score
+    assert JP.hit({"play": "让球", "outcome": "让平", "handicap": -1}, 2, 1)
+    assert JP.payout(plan, {"a": [2.0], "b": [], "c": [4.5]}) == (10.0, 18.0)               # 5 bets; a x c wins
+    print("PASS test_jc_plan_settlement")
+
+
 if __name__ == "__main__":
     test_jc_model()
+    test_jc_plan_settlement()

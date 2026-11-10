@@ -53,8 +53,15 @@ def parse_board(js, lg="all"):
             continue
         nm = lambda c: [(c.get("team") or {}).get(k, "") for k in ("displayName", "shortDisplayName", "name")]
         lgname = (ev.get("league") or {}).get("name") if isinstance(ev.get("league"), dict) else None
-        out.append({"id": str(ev.get("id")), "t": int(d.timestamp()), "lg": lgname or leagues.get(str(ev.get("leagueId")))
-                    or lg, "home": nm(t["home"]), "away": nm(t["away"]), "hs": hs, "as": as_})
+        row = {"id": str(ev.get("id")), "t": int(d.timestamp()), "lg": lgname or leagues.get(str(ev.get("leagueId")))
+               or lg, "home": nm(t["home"]), "away": nm(t["away"]), "hs": hs, "as": as_}
+        try:                                   # half-time score from the first period's line score, when ESPN has it
+            lh, la = t["home"].get("linescores") or [], t["away"].get("linescores") or []
+            if lh and la:
+                row["hh"], row["ha"] = int(float(lh[0].get("value"))), int(float(la[0].get("value")))
+        except (TypeError, ValueError, AttributeError):
+            pass
+        out.append(row)
     return out
 
 
