@@ -49,6 +49,14 @@ m = LogisticRegression(max_iter=3000, C=1.0).fit(X[D], Y[D])
 Pm = m.predict_proba(X[~D])
 base, ll = log_loss(Y[~D], P[~D], labels=[0, 1, 2]), log_loss(Y[~D], Pm, labels=[0, 1, 2])
 print(f"log-loss market {base:.5f}  model {ll:.5f}  ({(ll-base)*1000:+.2f}‰)")
+def bet_stats(Pr, th):
+    v = []
+    for pp, cc, yy in zip(Pr, C[~D], Y[~D]):
+        for i in range(3):
+            if pp[i] * cc[i] - 1 >= th:
+                v.append(cc[i] - 1 if yy == i else -1.0)
+    n = len(v); mu = sum(v) / n; sd = (sum((t-mu)**2 for t in v)/(n-1))**.5; h = 1.96*sd/n**.5
+    return {"n": n, "roi": round(mu, 4), "ci": [round(mu - h, 4), round(mu + h, 4)]}
 def bets(Pr, th, need_market_ok):
     v = []
     for pp, pk, cc, yy in zip(Pr, P[~D], C[~D], Y[~D]):
@@ -68,9 +76,8 @@ coef = m.coef_ - m.coef_.mean(axis=0)
 print("权重（对主胜/平/客胜的影响，已中心化）:")
 for j, n in enumerate(NAMES):
     print(f"  {n:22s} 主 {coef[0][j]:+.3f}  平 {coef[1][j]:+.3f}  客 {coef[2][j]:+.3f}")
-if ll > base + 0.0005:                     # never ship weights that predict clearly worse than the market alone
-    print("新权重在检验期比只看市场差，保留旧权重"); sys.exit(0)
 json.dump({"names": NAMES, "coef": m.coef_.tolist(), "intercept": m.intercept_.tolist(),
            "trained_until": datetime.fromtimestamp(SPL, timezone.utc).strftime("%Y-%m-%d"), "n_train": int(D.sum()), "n_test": int((~D).sum()),
-           "test_logloss_market": base, "test_logloss_model": ll},
+           "test_logloss_market": base, "test_logloss_model": ll, "bt4": bet_stats(Pm, 0.04),
+           "test_from": datetime.fromtimestamp(SPL, timezone.utc).strftime("%Y-%m-%d")},
           open(os.path.join(os.path.dirname(__file__), 'reco_weights.json'), 'w'), ensure_ascii=False)

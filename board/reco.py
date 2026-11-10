@@ -22,6 +22,8 @@ from .signals import power_devig
 
 W = json.load(open(os.path.join(os.path.dirname(__file__), "reco_weights.json")))
 TH = 0.04
+# the signals are used only while they predicted at least as well as the market alone in the latest held-out check
+USE_SIGNALS = W.get("test_logloss_model", 9) <= W.get("test_logloss_market", 0)
 OUT = ("主胜", "平局", "客胜")
 
 
@@ -90,7 +92,7 @@ def for_match(card, fd):
     st = state(fd, card["league"], card["home"], card["away"], card["start"]) if fd is not None else None
     if st:
         x = features(p_mk, x2["odds"], st)
-        p = predict(x)
+        p = predict(x) if USE_SIGNALS else p_mk
         base = predict(neutral(x))
         # each signal's own effect: switch it on alone over the neutral match
         names = W["names"]
@@ -103,10 +105,10 @@ def for_match(card, fd):
             if max(abs(v) for v in d) >= 0.002:
                 k = max(range(3), key=lambda i: abs(d[i]))
                 contrib.append({"name": names[j], "on": OUT[k], "d": round(d[k], 4)})
-        src = "综合（市场 + 状态 + 均值回归 + 同赔 + 交手）"
+        src = ("综合（市场 + 状态 + 均值回归 + 同赔 + 交手）" if USE_SIGNALS else
+               "只用市场：各信号在最新检验期没让预测更准，下面的偏离只作参考、未计入")
     else:
-        p, contrib, src = predict(features(p_mk, x2["odds"], {"form_h": [(1, 0)] * 3, "form_a": [(1, 0)] * 3,
-                                                               "same_h": [], "same_a": [], "h2h": []})), [], "只有市场（缺少两队的历史数据）"
+        p, contrib, src = p_mk, [], "只有市场（缺少两队的历史数据）"
     # best price on offer per outcome
     best = []
     for k in range(3):
@@ -117,7 +119,9 @@ def for_match(card, fd):
     k = max(range(3), key=lambda i: ev[i])
     rec = {"p": [round(v, 4) for v in p], "p_market": [round(v, 4) for v in p_mk], "ev": [round(v, 4) for v in ev],
            "best": [[b[0], b[1]] for b in best], "contrib": contrib, "src": src, "pick": OUT[k], "pick_i": k,
-           "go": ev[k] >= TH, "th": TH}
-    rec["text"] = (f"推荐买{OUT[k]}（{best[k][1]} {best[k][0]:.2f}，综合概率 {p[k] * 100:.0f}%，期望 {ev[k] * 100:+.1f}%）"
+           "go": ev[k] >= TH, "th": TH, "signals": USE_SIGNALS,
+           "check": {"from": W.get("test_from"), "n_test": W.get("n_test"), "bt4": W.get("bt4"),
+                     "d_ll": round((W.get("test_logloss_model", 0) - W.get("test_logloss_market", 0)) * 1000, 2)}}
+    rec["text"] = (f"推荐买{OUT[k]}（{best[k][1]} {best[k][0]:.2f}，{'综合' if USE_SIGNALS and st else '市场'}概率 {p[k] * 100:.0f}%，期望 {ev[k] * 100:+.1f}%）"
                    if rec["go"] else f"不建议下注（相对最好：{OUT[k]} {best[k][0]:.2f}，期望 {ev[k] * 100:+.1f}%）")
     return rec

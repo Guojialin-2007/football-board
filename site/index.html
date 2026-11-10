@@ -588,8 +588,8 @@ function recoHTML(fx){
   const row=(k,nm)=>`<tr><td>${nm}</td><td>${P(r.p_market[k])}</td><td><b>${P(r.p[k])}</b></td><td class="num">${r.best[k][0]} <span class="sub">${esc(r.best[k][1])}</span></td><td class="${r.ev[k]>=r.th?"pos":r.ev[k]<0?"neg":""}">${r.ev[k]>=0?"+":""}${(r.ev[k]*100).toFixed(1)}%</td></tr>`;
   return `<div class="reco big ${r.go?"go":""}">${esc(r.text)}</div>
   <div class="scroll"><table class="ht"><tr><th></th><th>市场概率</th><th>综合概率</th><th>能买到的最好赔率</th><th>综合期望</th></tr>${row(0,"主胜")}${row(1,"平局")}${row(2,"客胜")}</table></div>
-  ${r.contrib.length?`<div class="kh">各信号让综合概率偏离市场多少</div><div class="contrib">${r.contrib.map(c=>`<span>${esc(c.name)}：${esc(c.on)} <b class="${c.d>0?"pos":"neg"}">${c.d>0?"+":""}${(c.d*100).toFixed(1)}%</b></span>`).join("")}</div>`:""}
-  <div class="hint">权重由 20 年数据学出（${esc(r.src)}）：市场占绝对主导，其他信号只做小修正。期望 ≥4% 才推荐。最近三年回测：推荐 2,722 注，+4.8%（区间 −1.5% ~ +11%），为正但还没证实；实盘战绩记在"信号战绩"里，权重每月用新数据重新学。</div>`;
+  ${r.contrib.length?`<div class="kh">各信号让概率偏离市场多少${r.signals?"":"（最新检验无效，未计入推荐）"}</div><div class="contrib">${r.contrib.map(c=>`<span>${esc(c.name)}：${esc(c.on)} <b class="${c.d>0?"pos":"neg"}">${c.d>0?"+":""}${(c.d*100).toFixed(1)}%</b></span>`).join("")}</div>`:""}
+  <div class="hint">${esc(r.src)}。权重由 20 年数据学出，每月用新数据重新学，并在最近三年（${esc((r.check||{}).from||"")} 起，${(r.check||{}).n_test||"—"} 场）检验：综合模型的预测比只看市场${(r.check||{}).d_ll<=0?"好":"差"} ${Math.abs((r.check||{}).d_ll||0)}‰${(r.check||{}).bt4?`；综合期望 ≥4% 的推荐 ${r.check.bt4.n} 注，${R(r.check.bt4.roi)}（区间 ${R(r.check.bt4.ci[0])} ~ ${R(r.check.bt4.ci[1])}）`:""}。模型不如市场时，推荐只用市场概率，只有某家庄的价格比公平价高 4% 以上才推荐买。实盘战绩记在"信号战绩"里。</div>`;
 }
 function secJudge(fx){
   const d=fx.detail||{};
