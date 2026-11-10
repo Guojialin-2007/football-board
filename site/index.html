@@ -156,6 +156,10 @@ details[open] summary::before{content:"▾ "}
 .jkpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px}
 .jkpi div{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:grid}.jkpi span{font-size:12.5px;color:var(--muted)}.jkpi b{font-family:var(--num);font-size:18px}
 
+.reco{margin:2px 14px 10px;padding:8px 10px;border-radius:7px;font-size:14px;font-weight:600;background:var(--panel2);color:var(--muted)}
+.reco.go{background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good)}
+.reco.big{margin:4px 0 10px;font-size:16px;padding:10px 14px}
+.contrib{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px}
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 
 /* ---------- v2 ---------- */
@@ -329,6 +333,7 @@ function cardHTML(fx){
    <div class="meta"><span class="lgtag">${esc(fx.league)}${fx.country?`<span class="cty">${esc(zn(fx.country))}</span>`:""}</span><span class="ktime"><small>${dmd(fx.start)}</small>${hm(fx.start)}</span></div>
    <div class="teams"><div class="tm">${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
    ${ref?`<div class="mkt">${mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"])}</div>`:`<div class="sub">暂无盘口数据</div>`}
+   ${fx.reco?`<div class="reco ${fx.reco.go?"go":""}">${esc(fx.reco.text)}</div>`:""}
    ${flags}
    ${statsBlock(fx)}
   </div>`;
@@ -578,9 +583,17 @@ function briefRows(list,kind){
   return `<div class="scroll"><table class="ht"><tr><th>日期</th><th>联赛</th><th>主</th><th>比分</th><th>客</th><th>初赔 主/平/客</th><th>亚盘 初→终</th><th>大小 初→终</th></tr>${list.map(r=>`<tr><td>${new Date(r.t*1000).toLocaleDateString("zh-CN")}</td><td class="lgc">${esc(r.lg||"—")}</td><td>${zb(r.home)}</td><td><b>${r.score}</b></td><td>${zb(r.away)}</td><td>${r.odds?r.odds.join(" / "):"—"}</td><td>${r.ah?ahN(r.ah[0])+" → "+ahN(r.ah[1]):"—"}</td><td>${r.ou?r.ou[0]+" → "+r.ou[1]:"—"}</td></tr>`).join("")}</table></div>`;
 }
 const P=x=>x==null?"—":(x*100).toFixed(0)+"%", R=x=>x==null?"—":`<span class="${x>0?"pos":"neg"}">${(x*100).toFixed(1)}%</span>`;
+function recoHTML(fx){
+  const r=fx.reco;if(!r)return `<div class="hint">缺少胜平负盘口，给不出推荐。</div>`;
+  const row=(k,nm)=>`<tr><td>${nm}</td><td>${P(r.p_market[k])}</td><td><b>${P(r.p[k])}</b></td><td class="num">${r.best[k][0]} <span class="sub">${esc(r.best[k][1])}</span></td><td class="${r.ev[k]>=r.th?"pos":r.ev[k]<0?"neg":""}">${r.ev[k]>=0?"+":""}${(r.ev[k]*100).toFixed(1)}%</td></tr>`;
+  return `<div class="reco big ${r.go?"go":""}">${esc(r.text)}</div>
+  <div class="scroll"><table class="ht"><tr><th></th><th>市场概率</th><th>综合概率</th><th>能买到的最好赔率</th><th>综合期望</th></tr>${row(0,"主胜")}${row(1,"平局")}${row(2,"客胜")}</table></div>
+  ${r.contrib.length?`<div class="kh">各信号让综合概率偏离市场多少</div><div class="contrib">${r.contrib.map(c=>`<span>${esc(c.name)}：${esc(c.on)} <b class="${c.d>0?"pos":"neg"}">${c.d>0?"+":""}${(c.d*100).toFixed(1)}%</b></span>`).join("")}</div>`:""}
+  <div class="hint">权重由 20 年数据学出（${esc(r.src)}）：市场占绝对主导，其他信号只做小修正。期望 ≥4% 才推荐。最近三年回测：推荐 2,722 注，+4.8%（区间 −1.5% ~ +11%），为正但还没证实；实盘战绩记在"信号战绩"里，权重每月用新数据重新学。</div>`;
+}
 function secJudge(fx){
   const d=fx.detail||{};
-  let h="";
+  let h=`<div class="kh">默认推荐</div>`+recoHTML(fx);
   const VC={"有效":"pos","值得盯":"","避坑":"neg","没有优势":"sub"};
   const rs=d.rules||[];
   h+=`<div class="kh">本场命中的看盘规律</div>`;
@@ -721,7 +734,7 @@ const pc0=x=>x==null?"—":(x*100).toFixed(0)+"%";
 const SECS=[
   ["chart","盘口走势",fx=>{const r=fx.books.pinnacle||Object.values(fx.books)[0];return r&&r.ou?`大小球变盘 ${r.ou.changes} 次`:"Pinnacle 开盘 → 现在"},secChart],
   ["signals","信号与战绩",fx=>fx.flags.length?`${fx.flags.length} 条信号，每类的历史回报`:"没有信号",secSignals],
-  ["judge","判断与规律",fx=>{const d=fx.detail||{},rs=(d.rules||[]).filter(r=>r.verdict!=="没有优势");const r=fx.books.pinnacle&&fx.books.pinnacle["1x2"];
+  ["judge","推荐、判断与规律",fx=>{if(fx.reco)return fx.reco.text;const d=fx.detail||{},rs=(d.rules||[]).filter(r=>r.verdict!=="没有优势");const r=fx.books.pinnacle&&fx.books.pinnacle["1x2"];
     if(rs.length)return rs.map(r=>`${r.rule}：${r.verdict}`).join("；");
     return r?`市场：主胜 ${pc0(r.now.p[0])} · 平 ${pc0(r.now.p[1])} · 客胜 ${pc0(r.now.p[2])}${(d.rules||[]).length?`；命中 ${(d.rules||[]).length} 条规律，都没有优势`:""}`:"暂无盘口"},secJudge],
   ["move","历史同升降",fx=>{const m=((fx.detail||{}).same_move)||{};const a=m.ah,o=m.ou;const t=[];

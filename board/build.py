@@ -24,6 +24,7 @@ from . import learn as L
 from . import rules as RL
 from . import jc as JC
 from . import jcplan as JP
+from . import reco as RC
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -271,6 +272,10 @@ def run(inspect=False, log=print):
         c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
         ref = (c.get("books") or {}).get("pinnacle")
         c["detail"]["rules"] = RL.for_match(ref, lib, fdx, c) if lib else []
+        try:                               # 默认推荐 from weighted signals
+            c["reco"] = RC.for_match(c, fdx)
+        except Exception as e:             # noqa: BLE001
+            log(f"[reco] {c['id']}: {type(e).__name__}: {str(e)[:100]}")
         try:                               # 竞彩: every outcome's probability from Pinnacle's prices
             if ref and ref.get("ah") and ref.get("ou") and ref.get("1x2"):
                 a_, o_, x_ = ref["ah"]["now"], ref["ou"]["now"], ref["1x2"]["now"]

@@ -1,0 +1,26 @@
+name: reco-train
+on:
+  schedule:
+    - cron: "41 4 3 * *"        # monthly: refit the default-recommendation weights on the newest data
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: board-update
+  cancel-in-progress: false
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests numpy scikit-learn
+      - run: python -m board.reco_train
+      - name: Commit new weights
+        run: |
+          git config user.name "board-bot"
+          git config user.email "board-bot@users.noreply.github.com"
+          git add board/reco_weights.json
+          git diff --cached --quiet || git commit -m "Refit default-recommendation weights" && git push || true

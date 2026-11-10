@@ -30,6 +30,7 @@ LABELS = {
     "value": "某家庄赔率高过 Pinnacle 公平价",
     "form": "基本面和市场预期差 0.5 球以上：按基本面买",
     "conflict": "基本面和盘口方向矛盾：跟盘口买",
+    "reco": "默认推荐（综合期望 ≥4%，按当时最好的价格）",
 }
 
 
@@ -108,8 +109,13 @@ def state_from_row(r):
 
 
 def extra_bets(fx, ref):
-    """Signals that only exist live: soft-book value, form vs market, form/market conflict."""
+    """Signals that only exist live: soft-book value, form vs market, form/market conflict, the default pick."""
     out = {}
+    rc = fx.get("reco")
+    if rc and rc.get("go"):
+        k = rc["pick_i"]
+        out["reco"] = {"mk": "1x2", "side": ("home", "draw", "away")[k], "line": None, "odds": rc["best"][k][0],
+                       "book": rc["best"][k][1], "lv": 1, "g": "reco|1"}
     ou = (ref or {}).get("ou")
     for f in fx.get("flags") or []:
         k = f.get("k")
