@@ -148,15 +148,49 @@ def _score(f):
     return None
 
 
+def _sim(name, names):
+    """Share of the shorter name's words found in the other (0..1), best over ESPN's name variants."""
+    from .stats import toks, _eq
+    ta = toks(name)
+    best = 0.0
+    for n in names:
+        tb = toks(n)
+        if not ta or not tb:
+            continue
+        hit = sum(1 for x in ta if any(_eq(x, y) for y in tb))
+        best = max(best, hit / max(len(ta), len(tb)))
+    return best
+
+
 def espn_row(teams, f):
+    """The ESPN result of this fixture: same kick-off (+-36 h), and BOTH team names close at once.
+    Matching each name on its own picked wrong teams (CF Montreal -> Montrose, Orlando City -> Orlando Pride)."""
     k = ts(f.get("startTime"))
-    h, a = teams.find(f.get("participant1Name") or ""), teams.find(f.get("participant2Name") or "")
-    if not h or not a or not k:
+    hn, an = f.get("participant1Name") or "", f.get("participant2Name") or ""
+    if not k or not hn or not an:
         return None
-    for r in teams.res:
-        if abs(r["t"] - k) <= 36 * 3600 and r["home"][0] == h and r["away"][0] == a:
-            return r
-    return None
+    idx = getattr(teams, "_by_day", None)
+    if idx is None:
+        idx = {}
+        for r in teams.res:
+            idx.setdefault(r["t"] // 86400, []).append(r)
+        teams._by_day = idx
+    best, second = (0.0, None), 0.0
+    for d in (k // 86400 - 1, k // 86400, k // 86400 + 1):
+        for r in idx.get(d, []):
+            if abs(r["t"] - k) > 36 * 3600:
+                continue
+            sh, sa = _sim(hn, r["home"]), _sim(an, r["away"])
+            if min(sh, sa) < 0.5:
+                continue
+            sc = sh + sa
+            if sc > best[0]:
+                best, second = (sc, r), best[0]
+            elif sc > second:
+                second = sc
+    if best[1] is None or best[0] - second < 0.25:       # nothing, or two results equally plausible
+        return None
+    return best[1]
 
 
 def espn_score(teams, f):
@@ -172,6 +206,10 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
     sp = os.path.join(d, "state.json")
     st = json.load(open(sp)) if os.path.exists(sp) else {"weeks": {}, "tried": []}
     tried = set(st["tried"])
+    if st.get("v") != 2:                                   # results are now matched on both names at once: give
+        have = {r.get("id") for r in load_rows(data_dir)}  # every fixture dropped for "no score" another try
+        tried &= have
+        st["v"] = 2
     rows_path = os.path.join(d, "rows.jsonl")
     t0 = time.time()
     added = listed = 0
@@ -209,7 +247,7 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
             if time.time() - t0 > budget_s:
                 break
             fid = str(f.get("fixtureId"))
-            res = _score(f) or espn_score(teams, f)
+            res = _score(f) or espn_score(teams, f)        # ESPN, both team names matched together
             if res is None and time.time() - (ts(f.get("startTime")) or 0) < 4 * 86400:
                 continue                                   # result not in yet: try again next run
             tried.add(fid)

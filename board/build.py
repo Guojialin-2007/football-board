@@ -321,8 +321,8 @@ def run(inspect=False, log=print):
         JP.run(jc_result, DATA, SITE, log=log)
     except Exception as e:                 # noqa: BLE001
         log(f"[jcplan] stopped: {type(e).__name__}: {str(e)[:160]}")
-    if not full:                           # quick hourly run: odds and details only, history waits for the full run
-        hist_budget = 0.0
+    if not full:                           # quick hourly run: a few minutes of history backfill too
+        hist_budget = float(env("HIST_QUICK_MIN", 8)) * 60
     try:                                   # learn from right ideas, make 系统思路 for matching matches
         L.run(cards, rows, result_of, DATA, SITE, log=log)
     except Exception as e:                 # noqa: BLE001
