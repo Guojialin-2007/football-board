@@ -298,6 +298,9 @@ def test_jc_plan_settlement():
     assert JP.hit(plan["picks"][3], 2, 1, 0, 0) and JP.hit(plan["picks"][3], 2, 1) is None   # needs the half-time score
     assert JP.hit({"play": "让球", "outcome": "让平", "handicap": -1}, 2, 1)
     assert JP.payout(plan, {"a": [2.0], "b": [], "c": [4.5]}) == (10.0, 18.0)               # 5 bets; a x c wins
+    big = {"k": 2, "mult": 1, "picks": [{"match": "x", "play": "比分", "outcome": "5:2", "odds": 300},
+                                        {"match": "y", "play": "比分", "outcome": "4:2", "odds": 400}]}
+    assert JP.payout(big, {"x": [300], "y": [400]}) == (2.0, 160000.0)     # 2*300*400=240,000 -> cap 200,000 -> tax 20%
     print("PASS test_jc_plan_settlement")
 
 

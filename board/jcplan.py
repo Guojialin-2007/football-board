@@ -52,6 +52,17 @@ OWN = {"胜": {"1:0", "2:0", "2:1", "3:0", "3:1", "3:2", "4:0", "4:1", "4:2", "5
        "负": {"0:1", "0:2", "1:2", "0:3", "1:3", "2:3", "0:4", "1:4", "2:4", "0:5", "1:5", "2:5"}}
 
 
+CAP = {1: 100000, 2: 200000, 3: 200000, 4: 500000, 5: 500000}     # one 2-yuan bet's maximum prize; 6+: 1,000,000
+TAX_OVER, TAX = 10000, 0.2                                          # 20% tax on a single bet's prize above 10,000
+
+
+def bet_prize(prod, k):
+    w = min(2 * prod, CAP.get(k, 1000000))
+    if w > TAX_OVER:
+        w *= 1 - TAX
+    return round(w, 2)
+
+
 def payout(plan, hits):
     """hits: {match: [odds of the picks that won]} for every match. -> (stake, return)."""
     by = {}
@@ -65,10 +76,11 @@ def payout(plan, hits):
         for m in sub:
             n *= len(by[m])
         stake += 2 * mult * n
-        r = 2 * mult
-        for m in sub:
-            r *= sum(hits.get(m, []))
-        ret += r
+        for choice in itertools.product(*[hits.get(m, []) for m in sub]):   # one winning pick per match = one bet
+            prod = 1.0
+            for o in choice:
+                prod *= o
+            ret += bet_prize(prod, k) * mult
     return round(stake, 2), round(ret, 2)
 
 

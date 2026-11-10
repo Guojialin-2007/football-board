@@ -136,6 +136,7 @@ details[open] summary::before{content:"▾ "}
 .vtag{display:inline-block;font-size:12.5px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;margin-left:6px;font-weight:600}
 .vtag.sub{color:var(--muted)}
 .rt td,.rt th{text-align:left!important;vertical-align:top}.rt td:nth-child(5),.rt td:nth-child(6){white-space:nowrap}.rt td .sub{white-space:normal}
+.jverdict{font-weight:700;font-size:16px;padding:10px 14px;border-radius:8px;margin:6px 0}.jverdict.no{background:color-mix(in srgb,var(--up) 10%,transparent);color:var(--up)}.jverdict.go{background:color-mix(in srgb,var(--good) 12%,transparent);color:var(--good)}
 .jchips{display:flex;flex-wrap:wrap;gap:8px}
 .jchip{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer}
 .jchip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}.jchip.on .sub{color:inherit}
@@ -436,18 +437,55 @@ function jcJoint(fx,opts){
     for(let i1=0;i1<=N;i1++)for(let j1=0;j1<=N;j1++)for(let i2=0;i2<=N;i2++)for(let j2=0;j2<=N;j2++){const p=a[i1]*b[j1]*c[i2]*d[j2];t+=p;let mask=0;opts.forEach((o,q)=>{if(jcHit(o,i1+i2,j1+j2,i1,j1))mask|=1<<q});add(mask,p)}
     for(const k in m)m[k]/=t}
   else{const g=fx.jc.grid,t=g.flat().reduce((x,y)=>x+y,0);g.forEach((row,i)=>row.forEach((v,j)=>{let mask=0;opts.forEach((o,q)=>{if(jcHit(o,i,j))mask|=1<<q});add(mask,v/t)}))}
-  return Object.entries(m).map(([mask,p])=>({mask:+mask,p,v:opts.reduce((s,o,q)=>s+((+mask>>q&1)?o.odds:0),0)}));
+  return Object.entries(m).map(([mask,p])=>({mask:+mask,p,v:opts.reduce((s,o,q)=>s+((+mask>>q&1)?o.odds:0),0),od:opts.filter((o,q)=>+mask>>q&1).map(o=>o.odds)}));
 }
 function comb(n,k){let r=1;for(let i=1;i<=k;i++)r=r*(n-k+i)/i;return Math.round(r)}
 function esym(vals,k){const e=Array(k+1).fill(0);e[0]=1;for(const v of vals)for(let j=k;j>=1;j--)e[j]+=e[j-1]*v;return e[k]}
+/* 竞彩 rules used here (change in one place if the lottery changes them): maximum prize of one 2-yuan bet by the
+   number of matches in it, and the 20% tax on a single bet's prize above 10,000 yuan */
+const JC_CAP={1:100000,2:200000,3:200000,4:500000,5:500000},JC_CAP6=1000000,JC_TAX_OVER=10000,JC_TAX=0.2;
+function jcBet(prod,k){let w=Math.min(2*prod,JC_CAP[k]||JC_CAP6);if(w>JC_TAX_OVER)w*=1-JC_TAX;return Math.round(w*100)/100}
+function jcReturn(hitLists,k,mult){
+  /* every k-subset of matches with a hit, every choice of one winning pick per match: one bet each */
+  const ms=hitLists.filter(l=>l.length);let ret=0;
+  const pick=(start,left,prod)=>{if(!left){ret+=jcBet(prod,k);return}for(let i=start;i<=ms.length-left;i++)for(const o of ms[i])pick(i+1,left-1,prod*o)};
+  if(ms.length>=k)pick(0,k,1);return Math.round(ret*mult*100)/100}
 function jcParlay(G,k,mult,scale){
   const n=G.length,stake=2*mult*esym(G.map(g=>g.opts.length),k),byM={};let ev=0,pAny=0,pWin=0,pLoss=0;
   const ds=G.map(g=>{const xs=g.dist.map(s=>({...s,p:s.mask?s.p*scale:s.p}));const z=g.dist.filter(s=>s.mask).reduce((a,s)=>a+s.p,0)*(1-scale);const zero=xs.find(s=>!s.mask);if(zero)zero.p+=z;else xs.push({mask:0,p:z,v:0});return xs});
-  const go=(i,pr,vals,hits)=>{if(pr<1e-12)return;if(i===n){const ret=Math.round(2*mult*esym(vals,k)*100)/100,net=ret-stake;ev+=pr*net;if(ret>0)pAny+=pr;if(net>0)pWin+=pr;if(ret===0)pLoss+=pr;
+  const go=(i,pr,vals,hits)=>{if(pr<1e-12)return;if(i===n){const ret=jcReturn(vals,k,mult),net=ret-stake;ev+=pr*net;if(ret>0)pAny+=pr;if(net>0)pWin+=pr;if(ret===0)pLoss+=pr;
       const b=byM[hits]||(byM[hits]={p:0,min:Infinity,max:-Infinity});b.p+=pr;b.min=Math.min(b.min,net);b.max=Math.max(b.max,net);return}
-    for(const st of ds[i])go(i+1,pr*st.p,vals.concat(st.v),hits+(st.mask?1:0))};
+    for(const st of ds[i])go(i+1,pr*st.p,vals.concat([st.od||[]]),hits+(st.mask?1:0))};
   go(0,1,[],0);
   return {stake,ev,roi:ev/stake,pAny,pWin,pLoss,byM};
+}
+function jcNorm(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+function jcPhi(x){const t=1/(1+0.2316419*Math.abs(x)),d=0.3989423*Math.exp(-x*x/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274))));return x>0?1-p:p}
+function jcStress(G,k,mult,rho,N){
+  /* matches move together through one common factor: with rho > 0, "everything goes my way" and "nothing does"
+     both become more likely. A stress test over a range of rho, not an estimate of the real correlation. */
+  const stake=2*mult*esym(G.map(g=>g.opts.length),k);
+  const ord=G.map(g=>[...g.dist].sort((a,b)=>b.v-a.v));let ev=0,win=0,loss=0;
+  for(let s=0;s<N;s++){const z=jcNorm(),lists=[];
+    for(const d of ord){const u=jcPhi(Math.sqrt(rho)*z+Math.sqrt(1-rho)*jcNorm());let c=0,st=d[d.length-1];for(const x of d){c+=x.p;if(u<=c){st=x;break}}lists.push(st.od||[])}
+    const net=jcReturn(lists,k,mult)-stake;ev+=net;if(net>0)win++;if(net<=-stake+1e-9)loss++}
+  return {ev:ev/N,pWin:win/N,pLoss:loss/N};
+}
+function jcCands(){
+  /* every option with a 竞彩 price filled in, on the selected matches, ranked in the framework's three groups */
+  const out=[];for(const id of JC.sel){const fx=DATA.fixtures.find(f=>f.id===id);if(!fx||!fx.jc)continue;const h=JC.hcap[id]??-1,O=jcOutcomes(fx.jc,h);
+    for(const play in O)for(const o in O[play]){const k=jcKey(id,play,o),od=parseFloat(JC.odds[k]);if(!(od>1))continue;const p=O[play][o],ev=p*od-1;
+      const why=ev>=0.04?"合格：期望 ≥ +4%（研究里临近开赛价差 ≥4% 长期为正）":ev>=0?"拒绝：优势不到 4%，不够覆盖模型误差和价格变化":`拒绝：负期望（保本要 ${(100/od).toFixed(1)}%，推算只有 ${(p*100).toFixed(1)}%）`;
+      out.push({id,fx,play,o,h,p,od,ev,ok:ev>=0.04,grp:p>=0.5?"A":p>=0.2?"B":"C",why})}}
+  return out.sort((a,b)=>b.ev-a.ev);
+}
+function jcCandsHTML(){
+  const cs=jcCands();if(!cs.length)return `<p>在上面填入竞彩赔率后，这里把所有填过的选项分成三类排名，并写明选或拒的理由。</p>`;
+  const ok=cs.filter(c=>c.ok),GN={A:"A 高概率（≥50%）",B:"B 平衡（20%～50%）",C:"C 高赔率（<20%）"};
+  const age=Math.min(...cs.map(c=>c.fx.jc.at||DATA.generated||0)),hrs=(Date.now()/1000-age)/3600;
+  return `<div class="jverdict ${ok.length?"go":"no"}">${ok.length?`有 ${ok.length} 个合格候选，可以只用它们来组合`:"建议：不买。没有一个选项的竞彩赔率高过 Pinnacle 公平概率 4% 以上"}</div>
+  <div class="hint">证据等级：${hrs<=2?"一级（Pinnacle 价格是 "+Math.max(0,hrs*60).toFixed(0)+" 分钟内的，请填同一时刻的竞彩赔率）":"二级（Pinnacle 价格已经是 "+hrs.toFixed(1)+" 小时前的，只能作初步参考）"}。扫描的选项越多，越容易碰到"看起来有价差"的巧合，4% 的门槛就是为此设的。</div>
+  ${["A","B","C"].map(g=>{const xs=cs.filter(c=>c.grp===g);return xs.length?`<h3>${GN[g]}</h3><div class="scroll"><table class="ht rt"><tr><th>选项</th><th>竞彩赔率</th><th>推算概率</th><th>期望</th><th>取舍</th></tr>${xs.map(c=>`<tr><td>${esc(zn(c.fx.home))} vs ${esc(zn(c.fx.away))}：${esc(c.play==="让球"?`让球(${c.h>0?"+":""}${c.h}) `:c.play==="胜平负"?"":c.play+" ")}${esc(c.o)}</td><td class="num">${c.od}</td><td>${(c.p*100).toFixed(1)}%</td><td class="${evCls(c.ev)}">${(c.ev*100).toFixed(1)}%</td><td class="${c.ok?"pos":"sub"}" style="white-space:normal">${c.why}</td></tr>`).join("")}</table></div>`:""}).join("")}`;
 }
 function jcParlayHTML(){
   const G=jcGroups();
@@ -470,7 +508,8 @@ function jcParlayHTML(){
   </div>
   ${bad?`<div class="hint neg">有 ${bad} 个选项本身是负期望：串关不会把负期望变成正的，只会把亏损放大。</div>`:""}
   <div class="scroll"><table class="ht"><tr><th>有命中的场数</th><th>概率</th><th>最少净赚</th><th>最多净赚</th></tr>${mrows}</table></div>
-  <div class="hint">同一场的多个选项按同一个比分分布算联合概率（"胜"和"2:1"会一起中）；不同场之间按相互独立计算。奖金按 2 元一注 × 赔率连乘，未计单注奖金上限。</div>
+  <h3>相关性压力测试</h3><div class="scroll"><table class="ht"><tr><th>各场之间的共同相关</th><th>净盈利概率</th><th>全损概率</th><th>期望净收益</th></tr>${[0,0.1,0.2,0.3].map(r=>{const x=r?jcStress(G,k,JC.mult,r,20000):{ev:R0.ev,pWin:R0.pWin,pLoss:R0.pLoss};return `<tr><td>${r?r:"0（独立）"}</td><td>${(x.pWin*100).toFixed(1)}%</td><td>${(x.pLoss*100).toFixed(1)}%</td><td class="${x.ev>=0?"pos":"neg"}">${x.ev>=0?"+":""}${x.ev.toFixed(2)} 元</td></tr>`}).join("")}</table></div>
+  <div class="hint">真实的相关程度不知道，所以不编一个数，而是看 0.1～0.3 时结论会不会变（模拟 2 万次）。正相关（各场一起顺、一起不顺）对串关有利，负相关有害；不同比赛之间的真实相关接近 0、方向不明。所以只有在"独立"那一行就已经是正期望时才值得考虑，不要因为相关性高时变正而去买。同一场的多个选项按同一个比分分布算联合概率（"胜"和"2:1"会一起中）。奖金：每注 2 元 × 赔率连乘，单注上限单关 10 万、2～3 关 20 万、4～5 关 50 万、6 关及以上 100 万，单注超过 1 万元扣 20% 偶然所得税。</div>
   <a class="btn" target="_blank" rel="noopener" href="${jcFreezeURL(G,k,R0)}">冻结这张方案（提交到 GitHub，带时间戳）</a>`;
 }
 function jcFreezeURL(G,k,R){
@@ -495,8 +534,9 @@ function renderJC(){
   <p>概率由 Pinnacle 的亚盘、大小球、胜平负价格推出（同一个比分分布，五种玩法一致；在 3,000 场历史比赛上校准过）。"公平赔率" = 1 ÷ 概率。竞彩赔率要高过公平赔率才是正期望；竞彩抽水比 Pinnacle 高得多，多数时候是负的，那就别买。</p>
   <h3>1. 选比赛</h3>${fxs.length?`<div class="jchips">${chips}</div>`:`<p>现在没有带 Pinnacle 价格、尚未开赛的比赛。</p>`}
   ${JC.sel.map(id=>DATA.fixtures.find(f=>f.id===id)).filter(f=>f&&f.jc).map(jcMatchHTML).join("")}
-  <h3>2. 串关</h3>${jcParlayHTML()}
-  <h3>3. 已冻结方案的战绩</h3>${jcPlansHTML()}`;
+  <h3>2. 候选排名和取舍</h3>${jcCandsHTML()}
+  <h3>3. 串关</h3>${jcParlayHTML()}
+  <h3>4. 已冻结方案的战绩</h3>${jcPlansHTML()}`;
 }
 fetch("jcplans.json?"+Date.now()).then(r=>r.json()).then(x=>{JC.plans=x;if(!$("#jcPanel").hidden)renderJC()}).catch(()=>{});
 $("#jcTab").onclick=e=>{const on=$("#jcPanel").hidden;$("#jcPanel").hidden=!on;e.target.classList.toggle("on",on);if(on)renderJC()};
