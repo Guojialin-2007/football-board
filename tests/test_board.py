@@ -272,3 +272,21 @@ if __name__ == "__main__":
         if n.startswith("test_"):
             f()
             print("PASS", n)
+
+
+def test_jc_model():
+    from board import jc
+    r = jc.from_market(-0.5, [2.02, 1.88], 2.75, [2.02, 1.86], [2.05, 3.40, 3.80], -1)
+    assert r["fit"]["err"] < 1e-6 and not r["problems"], r["problems"]
+    o = r["outcomes"]
+    assert len(o["比分"]) == 31 and len(o["总进球"]) == 8 and len(o["半全场"]) == 9
+    # the fit reproduces the market: de-vigged draw and the Asian line
+    g = jc.grid(r["fit"]["lh"], r["fit"]["la"], r["fit"]["rho"])
+    from board.signals import devig, power_devig
+    assert abs(jc.p1x2(g)[1] - power_devig([2.05, 3.40, 3.80])[1]) < 1e-3
+    assert abs(jc.ah_eff(g, -0.5) - devig([2.02, 1.88])[0]) < 1e-3
+    print("PASS test_jc_model")
+
+
+if __name__ == "__main__":
+    test_jc_model()

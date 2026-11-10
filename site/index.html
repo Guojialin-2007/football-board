@@ -136,6 +136,25 @@ details[open] summary::before{content:"▾ "}
 .vtag{display:inline-block;font-size:12.5px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;margin-left:6px;font-weight:600}
 .vtag.sub{color:var(--muted)}
 .rt td,.rt th{text-align:left!important;vertical-align:top}.rt td:nth-child(5),.rt td:nth-child(6){white-space:nowrap}.rt td .sub{white-space:normal}
+.jchips{display:flex;flex-wrap:wrap;gap:8px}
+.jchip{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:8px 12px;font:inherit;font-size:14px;cursor:pointer}
+.jchip.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}.jchip.on .sub{color:inherit}
+.jm{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0}
+.jmh{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}.jmh b{font-size:16px}
+.jx{margin-left:auto;background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:3px 10px;font:inherit;font-size:13px;cursor:pointer}
+.jtabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px;align-items:center}
+.jtab{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:5px 12px;font:inherit;font-size:14px;cursor:pointer}
+.jtab.on{background:var(--text);color:var(--panel);border-color:var(--text);font-weight:600}
+.jh{font-size:13.5px;color:var(--muted);margin-left:8px}.jh input{width:52px;margin-left:6px}
+.jt td{vertical-align:middle}.jt tr.jpick td{background:color-mix(in srgb,var(--brand) 8%,transparent)}
+.jodds,.jh input,.jctl input{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 8px;font-family:var(--num);font-size:15px;width:84px}
+.jsel{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer}
+.jsel.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.jpl{display:grid;gap:4px;font-size:14.5px;margin-bottom:10px}
+.jctl{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 12px;font-size:14px}.jctl select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px;font:inherit}
+.jkpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.jkpi div{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:grid}.jkpi span{font-size:12.5px;color:var(--muted)}.jkpi b{font-family:var(--num);font-size:18px}
+
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 
 /* ---------- v2 ---------- */
@@ -231,13 +250,14 @@ details summary{font-size:13px}
     <span class="chip" id="onlyFlags">只看有信号</span>
     <span class="chip" id="sortScore">按信号强度排序</span>
     <span class="chip" id="histTab">历史规律</span>
+    <span class="chip" id="jcTab">竞彩计算</span>
     <span class="chip" id="rulesTab">规律库</span>
     <span class="chip" id="trackTab">信号战绩</span>
     <span class="chip" id="ideasTab">思路战绩</span>
   </div>
 </div></header>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
-<main class="wrap"><div id="hist" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="jcPanel" class="panel" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
 <div class="note">数据：OddsPapi 盘口（Pinnacle 为参考）、ESPN 赛果、football-data 历史。每小时更新。只提供信息，不是投注建议。</div></main>
 <script>
 const $=s=>document.querySelector(s);
@@ -363,6 +383,90 @@ function recLine(f){
   const one=(lab,x)=>x?`${lab} ${x.n} 场，跟着买 ${R(x.roi)}${x.ci&&x.ci[0]<0&&x.ci[1]>0?"，看不出真差别":""}`:`${lab} 暂无`;
   return `<span class="rec">这类信号战绩：${one("回测",r.bt)}；${one("实盘",r.live)}</span>`;
 }
+
+/* ---------------- 竞彩计算 ---------------- */
+const JC={sel:[],odds:{},hcap:{},picks:{},tab:{},k:null,mult:1};
+const JCS_H=["1:0","2:0","2:1","3:0","3:1","3:2","4:0","4:1","4:2","5:0","5:1","5:2"],JCS_D=["0:0","1:1","2:2","3:3"],JCS_A=["0:1","0:2","1:2","0:3","1:3","2:3","0:4","1:4","2:4","0:5","1:5","2:5"];
+function jcOutcomes(j,h){
+  const g=j.grid,t=g.flat().reduce((a,b)=>a+b,0);let W=0,D=0,L=0,rw=0,rd=0,rl=0;const tg=Array(8).fill(0),cs={};
+  g.forEach((row,i)=>row.forEach((v,jj)=>{const p=v/t,d=i-jj;if(d>0)W+=p;else if(d===0)D+=p;else L+=p;const m=d+h;if(m>0)rw+=p;else if(m===0)rd+=p;else rl+=p;tg[Math.min(i+jj,7)]+=p;cs[i+":"+jj]=p}));
+  const sc={};JCS_H.concat(JCS_D,JCS_A).forEach(k=>sc[k]=cs[k]||0);
+  sc["胜其他"]=W-JCS_H.reduce((a,k)=>a+sc[k],0);sc["平其他"]=D-JCS_D.reduce((a,k)=>a+sc[k],0);sc["负其他"]=L-JCS_A.reduce((a,k)=>a+sc[k],0);
+  return {"胜平负":{"胜":W,"平":D,"负":L},"让球":{"让胜":rw,"让平":rd,"让负":rl},"总进球":Object.fromEntries(tg.map((v,i)=>[i<7?String(i):"7+",v])),"比分":sc,"半全场":j.hafu};
+}
+const jcFx=()=>(DATA&&DATA.fixtures||[]).filter(f=>f.jc&&f.start>Date.now()/1000);
+const evCls=e=>e==null?"":e>=0.04?"pos":e>=0?"":"neg";
+function jcKey(id,play,o){return id+"|"+play+"|"+o}
+function jcPickList(){return Object.entries(JC.picks).map(([id,k])=>{const fx=DATA.fixtures.find(f=>f.id===id);if(!fx)return null;const [_, play, o]=k.split("|");
+  const h=JC.hcap[id]??-1,p=jcOutcomes(fx.jc,h)[play][o],od=parseFloat(JC.odds[k]);return {id,fx,play,o,p,odds:od,label:`${zn(fx.home)} vs ${zn(fx.away)}：${play==="让球"?`让球(${h>0?"+":""}${h}) `:play==="胜平负"?"":play+" "}${o}`}}).filter(x=>x)}
+function comb(n,k){let r=1;for(let i=1;i<=k;i++)r=r*(n-k+i)/i;return Math.round(r)}
+function jcParlay(ps,k,mult,scale){
+  const n=ps.length,stake=2*comb(n,k)*mult,dist=[];let ev=0,pAny=0,pWin=0,pLoss=0;const byM={};
+  for(let mask=0;mask<(1<<n);mask++){
+    let pr=1;const hit=[];for(let i=0;i<n;i++){const p=Math.min(ps[i].p*scale,1);if(mask>>i&1){pr*=p;hit.push(i)}else pr*=1-p}
+    let ret=0;if(hit.length>=k){const go=(start,left,prod)=>{if(!left){ret+=2*mult*prod;return}for(let i=start;i<=hit.length-left;i++)go(i+1,left-1,prod*ps[hit[i]].odds)};go(0,k,1)}
+    ret=Math.round(ret*100)/100;const net=ret-stake;ev+=pr*net;if(ret>0)pAny+=pr;if(net>0)pWin+=pr;if(ret===0)pLoss+=pr;
+    const m=hit.length,b=byM[m]||(byM[m]={p:0,min:Infinity,max:-Infinity});b.p+=pr;b.min=Math.min(b.min,net);b.max=Math.max(b.max,net);
+  }
+  return {stake,ev,roi:ev/stake,pAny,pWin,pLoss,byM};
+}
+function jcMatchHTML(fx){
+  const id=fx.id,j=fx.jc,ref=fx.books.pinnacle,defH=ref&&ref.ah&&ref.ah.now.line<0?-1:1,h=JC.hcap[id]??defH;JC.hcap[id]=h;
+  const O=jcOutcomes(j,h),tab=JC.tab[id]||"胜平负";
+  const tabs=["胜平负","让球","总进球","比分","半全场"].map(t=>`<button class="jtab ${t===tab?"on":""}" onclick="JC.tab['${esc(id)}']='${t}';renderJC()">${t}</button>`).join("");
+  const rows=Object.entries(O[tab]).map(([o,p])=>{const k=jcKey(id,tab,o),od=parseFloat(JC.odds[k]),ev=od>1?p*od-1:null,on=JC.picks[id]===k;
+    return `<tr class="${on?"jpick":""}"><td><b>${esc(o)}</b></td><td>${(p*100).toFixed(1)}%</td><td>${p>0.0005?(1/p).toFixed(2):"—"}</td>
+    <td><input class="jodds" inputmode="decimal" placeholder="填赔率" value="${esc(JC.odds[k]||"")}" onchange="JC.odds['${esc(k)}']=this.value;renderJC()"></td>
+    <td>${od>1?(100/od).toFixed(1)+"%":"—"}</td><td class="${evCls(ev)}">${ev==null?"—":(ev>=0?"+":"")+(ev*100).toFixed(1)+"%"}</td>
+    <td>${od>1?`<button class="jsel ${on?"on":""}" onclick="JC.picks['${esc(id)}']=${on?"undefined":`'${esc(k)}'`};if(!JC.picks['${esc(id)}'])delete JC.picks['${esc(id)}'];renderJC()">${on?"已选":"选"}</button>`:""}</td></tr>`}).join("");
+  return `<div class="jm"><div class="jmh"><b>${zn(fx.home)} vs ${zn(fx.away)}</b><span class="sub">${esc(fx.league)} · ${fmtT(fx.start)} · Pinnacle 推算：主队进球 ${j.fit.lh.toFixed(2)}，客队 ${j.fit.la.toFixed(2)}</span>
+  <button class="jx" onclick="JC.sel=JC.sel.filter(x=>x!=='${esc(id)}');delete JC.picks['${esc(id)}'];renderJC()">移除</button></div>
+  <div class="jtabs">${tabs}${tab==="让球"?`<label class="jh">竞彩让球（主队）<input inputmode="numeric" value="${h}" onchange="JC.hcap['${esc(id)}']=parseInt(this.value)||0;renderJC()"></label>`:""}</div>
+  <div class="scroll"><table class="ht jt"><tr><th>结果</th><th>概率</th><th>公平赔率</th><th>竞彩赔率</th><th>保本概率</th><th>期望收益</th><th></th></tr>${rows}</table></div></div>`;
+}
+function jcParlayHTML(){
+  const ps=jcPickList();
+  if(!ps.length)return `<p>在上面每场比赛里填入竞彩赔率，点"选"，就会出现在这里。每场只能选一个结果（复式还不支持）。</p>`;
+  const n=ps.length;if(JC.kn!==n){JC.k=n;JC.kn=n}const k=Math.min(Math.max(JC.k||n,1),n);JC.k=k;
+  const R0=jcParlay(ps,k,JC.mult,1),R5=jcParlay(ps,k,JC.mult,0.95);
+  const ks=[...Array(n)].map((_,i)=>i+1).map(x=>`<option value="${x}" ${x===k?"selected":""}>${x===1?"单关（每场单买）":`${n} 场选 ${x} 关（${comb(n,x)} 注）`}</option>`).join("");
+  const mrows=Object.entries(R0.byM).sort((a,b)=>b[0]-a[0]).map(([m,b])=>`<tr><td>中 ${m} 场</td><td>${(b.p*100).toFixed(1)}%</td><td class="${b.min>0?"pos":b.min<0?"neg":""}">${b.min>=0?"+":""}${b.min.toFixed(2)}</td><td class="${b.max>0?"pos":b.max<0?"neg":""}">${b.max>=0?"+":""}${b.max.toFixed(2)}</td></tr>`).join("");
+  const bad=ps.filter(p=>p.p*p.odds-1<0).length;
+  return `<div class="jpl">${ps.map(p=>`<div>${esc(p.label)}　<span class="num">@${p.odds}</span>　概率 ${(p.p*100).toFixed(1)}%　<span class="${evCls(p.p*p.odds-1)}">${((p.p*p.odds-1)*100).toFixed(1)}%</span></div>`).join("")}</div>
+  <div class="jctl"><label>过关方式 <select onchange="JC.k=parseInt(this.value);renderJC()">${ks}</select></label><label>倍数 <input inputmode="numeric" value="${JC.mult}" onchange="JC.mult=Math.max(1,parseInt(this.value)||1);renderJC()"></label></div>
+  <div class="jkpi">
+    <div><span>本金</span><b>${R0.stake} 元</b></div>
+    <div><span>至少有返奖</span><b>${(R0.pAny*100).toFixed(1)}%</b></div>
+    <div><span>净盈利（返奖 > 本金）</span><b>${(R0.pWin*100).toFixed(1)}%</b></div>
+    <div><span>全部亏光</span><b>${(R0.pLoss*100).toFixed(1)}%</b></div>
+    <div><span>期望净收益</span><b class="${R0.ev>=0?"pos":"neg"}">${R0.ev>=0?"+":""}${R0.ev.toFixed(2)} 元（${(R0.roi*100).toFixed(1)}%）</b></div>
+    <div><span>概率都高估 5% 时</span><b class="${R5.ev>=0?"pos":"neg"}">${R5.ev>=0?"+":""}${R5.ev.toFixed(2)} 元，盈利概率 ${(R5.pWin*100).toFixed(1)}%</b></div>
+  </div>
+  ${bad?`<div class="hint neg">有 ${bad} 个选项本身是负期望：串关不会把负期望变成正的，只会把亏损放大。</div>`:""}
+  <div class="scroll"><table class="ht"><tr><th>命中场数</th><th>概率</th><th>最少净赚</th><th>最多净赚</th></tr>${mrows}</table></div>
+  <div class="hint">按各场相互独立计算。奖金按 2 元一注 × 赔率连乘，未计单注奖金上限。</div>
+  <a class="btn" target="_blank" rel="noopener" href="${jcFreezeURL(ps,k,R0)}">冻结这张方案（提交到 GitHub，带时间戳）</a>`;
+}
+function jcFreezeURL(ps,k,R){
+  if(!DATA.repo)return "#";
+  const t=new Date().toLocaleString("zh-CN",{hour12:false});
+  const body=["赛前冻结方案（提交后不可修改，赛后按此复盘）","","生成时间："+t,"过关："+(k===1?"单关":ps.length+" 场选 "+k+" 关")+"，倍数 "+JC.mult+"，本金 "+R.stake+" 元","",
+    ...ps.map(p=>`- ${p.label} @${p.odds}｜Pinnacle 推算概率 ${(p.p*100).toFixed(1)}%｜期望 ${((p.p*p.odds-1)*100).toFixed(1)}%｜比赛 ${p.id}`),"",
+    `至少有返奖 ${(R.pAny*100).toFixed(1)}%｜净盈利 ${(R.pWin*100).toFixed(1)}%｜全损 ${(R.pLoss*100).toFixed(1)}%｜期望净收益 ${R.ev.toFixed(2)} 元（${(R.roi*100).toFixed(1)}%）`,"",
+    "```json",JSON.stringify({k,mult:JC.mult,stake:R.stake,picks:ps.map(p=>({match:p.id,play:p.play,outcome:p.o,handicap:p.play==="让球"?JC.hcap[p.id]:undefined,odds:p.odds,p:+p.p.toFixed(4)}))}),"```"].join("\n");
+  return `https://github.com/${DATA.repo}/issues/new?title=${encodeURIComponent("[竞彩方案] "+t)}&body=${encodeURIComponent(body)}`;
+}
+function renderJC(){
+  if(!DATA)return;const fxs=jcFx();
+  const chips=fxs.map(f=>`<button class="jchip ${JC.sel.includes(f.id)?"on":""}" onclick="JC.sel.includes('${esc(f.id)}')?(JC.sel=JC.sel.filter(x=>x!=='${esc(f.id)}'),delete JC.picks['${esc(f.id)}']):JC.sel.push('${esc(f.id)}');renderJC()">${zn(f.home)} vs ${zn(f.away)}<span class="sub"> ${hm(f.start)}</span></button>`).join("");
+  $("#jcPanel").innerHTML=`<h2>竞彩计算：价格值不值、串关怎么配</h2>
+  <p>概率由 Pinnacle 的亚盘、大小球、胜平负价格推出（同一个比分分布，五种玩法一致；在 3,000 场历史比赛上校准过）。"公平赔率" = 1 ÷ 概率。竞彩赔率要高过公平赔率才是正期望；竞彩抽水比 Pinnacle 高得多，多数时候是负的，那就别买。</p>
+  <h3>1. 选比赛</h3>${fxs.length?`<div class="jchips">${chips}</div>`:`<p>现在没有带 Pinnacle 价格、尚未开赛的比赛。</p>`}
+  ${JC.sel.map(id=>DATA.fixtures.find(f=>f.id===id)).filter(f=>f&&f.jc).map(jcMatchHTML).join("")}
+  <h3>2. 串关</h3>${jcParlayHTML()}`;
+}
+$("#jcTab").onclick=e=>{const on=$("#jcPanel").hidden;$("#jcPanel").hidden=!on;e.target.classList.toggle("on",on);if(on)renderJC()};
+
 function renderRules(x){
   if(!x){$("#rulesPanel").innerHTML=`<h2>规律库</h2><p>还没有数据。</p>`;return}
   const VC={"有效":"pos","值得盯":"","避坑":"neg","没有优势":"sub"},MK={ah:"亚盘",ou:"大小球",x2:"胜平负"};

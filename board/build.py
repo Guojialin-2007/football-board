@@ -22,6 +22,7 @@ from . import history as H
 from . import ideas as I
 from . import learn as L
 from . import rules as RL
+from . import jc as JC
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -269,6 +270,15 @@ def run(inspect=False, log=print):
         c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
         ref = (c.get("books") or {}).get("pinnacle")
         c["detail"]["rules"] = RL.for_match(ref, lib, fdx, c) if lib else []
+        try:                               # 竞彩: every outcome's probability from Pinnacle's prices
+            if ref and ref.get("ah") and ref.get("ou") and ref.get("1x2"):
+                a_, o_, x_ = ref["ah"]["now"], ref["ou"]["now"], ref["1x2"]["now"]
+                r = JC.from_market(a_["line"], a_.get("odds"), o_["line"], o_.get("odds"), x_.get("odds"))
+                if r["fit"]["err"] < 1e-4 and not r["problems"]:
+                    c["jc"] = {"fit": r["fit"], "grid": r["grid"], "hafu": r["outcomes"]["半全场"],
+                               "at": max(ref[k].get("now_t") or 0 for k in ("ah", "ou", "1x2")) or int(time.time())}
+        except Exception as e:             # noqa: BLE001
+            log(f"[jc] {c['id']}: {type(e).__name__}: {str(e)[:100]}")
         c["flags"] += move_flags(c)
         c["score"] = sum(x["lv"] for x in c["flags"])
     # ---- ideas (思路): remember every fixture seen, settle ideas once the score is known
