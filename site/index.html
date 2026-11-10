@@ -160,6 +160,7 @@ details[open] summary::before{content:"▾ "}
 .reco.go{background:color-mix(in srgb,var(--good) 13%,transparent);color:var(--good)}
 .reco.big{margin:4px 0 10px;font-size:16px;padding:10px 14px}
 .contrib{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px}
+.hsel{display:inline-flex;align-items:center;gap:8px;font-size:14px;margin:4px 0 8px}.hsel select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 10px;font:inherit;font-size:14px}
 .subkv{margin-left:10px;padding:4px 0 4px 10px;border-left:2px solid var(--line,#444);font-size:.95em}
 
 /* ---------- v2 ---------- */
@@ -369,13 +370,18 @@ function histTable(g,kind){
   return `<div class="scroll"><table class="ht"><tr><th>开盘 → 收盘</th><th>场数</th><th>${what[0]}</th><th>${what[1]}</th><th>${what[2]}</th><th>按变动方向${what[3]}</th><th>跟着买（收盘价）</th><th>反着买（收盘价）</th></tr>
   ${keys.map(k=>{const x=g[k];return `<tr><td>${lab(k)}</td><td>${x.n}</td><td>${f2(x.actual)}</td><td>${f2(x.open)}</td><td>${f2(x.close)}</td><td>${x.went==null?"—":(x.went*100).toFixed(0)+"%"}</td><td>${pc(x.follow)} ${ci(x.follow_ci)}</td><td>${pc(x.fade)} ${ci(x.fade_ci)}</td></tr>`}).join("")}</table></div>`;
 }
+let HIST=null,HLG="全部";
 function renderHist(h){
+  if(h)HIST=h;h=HIST;
   if(!h||!h.n){$("#hist").innerHTML=`<h2>历史规律</h2><p>历史比赛还在积累中：每次自动更新都会补几百场已完赛的比赛，几天后这里就有数据。</p>`;return}
-  $("#hist").innerHTML=`<h2>历史规律：盘口从开盘到收盘一模一样地变化之后，比赛最后怎么结束</h2>
-  <p>${h.n} 场已完赛的比赛（Pinnacle 开盘 vs 收盘，${new Date(h.since*1000).toLocaleDateString("zh-CN")} 起）。"档" = 0.25 球。按开盘和收盘的具体盘口分组（2→2.25 和 3→3.25 分开算），只列 5 场以上的组；这里是所有联赛合计，单场详情里的"历史同升降"只看同联赛、同球队。
-  "跟着买" = 按盘口变动的方向、以收盘赔率下注；"反着买" = 认为是诱盘、反方向下注。回报按亚洲盘结算，扣了庄家抽水；括号里是 95% 区间，跨过 0 就说明看不出差别。</p>
-  <h3>大小球（盘口线升降）</h3>${histTable(h.ou,"ou")}
-  <h3>亚盘（主队让球升降）</h3>${histTable(h.ah,"ah")}`;
+  const lgs=Object.keys(h.leagues||{}).sort((a,b)=>h.leagues[b].n-h.leagues[a].n);
+  const own=HLG==="全部"?h:(h.leagues||{})[HLG],fd=(h.fd||{})[HLG];
+  const sel=`<label class="hsel">联赛 <select onchange="HLG=this.value;renderHist()"><option value="全部" ${HLG==="全部"?"selected":""}>全部联赛（${h.n} 场）</option>${lgs.map(l=>`<option value="${esc(l)}" ${l===HLG?"selected":""}>${esc(l)}（本站 ${h.leagues[l].n} 场${(h.fd||{})[l]?`，football-data ${h.fd[l].n} 场`:""}）</option>`).join("")}</select></label>`;
+  $("#hist").innerHTML=`<h2>历史规律：盘口从开盘到收盘一模一样地变化之后，比赛最后怎么结束</h2>${sel}
+  <p>"档" = 0.25 球。按开盘和收盘的具体盘口分组（2→2.25 和 3→3.25 分开算），只列 5 场以上的组。"跟着买" = 按盘口变动的方向、以收盘赔率下注；"反着买" = 认为是诱盘、反方向下注。回报按亚洲盘结算，扣了庄家抽水；括号里是 95% 区间，跨过 0 就说明看不出差别。</p>
+  <h3>大小球（本站：Pinnacle 开盘 vs 收盘，${own?own.n:0} 场${h.since?"，"+new Date(h.since*1000).toLocaleDateString("zh-CN")+" 起":""}）</h3>${own?histTable(own.ou,"ou"):"<p>这个联赛本站还没有记录。</p>"}
+  <h3>亚盘（本站，${own?own.n:0} 场）</h3>${own?histTable(own.ah,"ah"):"<p>这个联赛本站还没有记录。</p>"}
+  ${fd?`<h3>亚盘（football-data：Pinnacle 赛前一两天 vs 收盘，${fd.n} 场，${new Date(fd.since*1000).getFullYear()} 年起）</h3><p class="sub">样本大得多，但"开盘"是赛前一两天的快照，不是真正的初盘。大小球 football-data 只有 2.5 一条线，没有升降。</p>${histTable(fd.ah,"ah")}`:`<p class="sub">football-data 没有这个联赛的亚盘开收盘数据。</p>`}`;
 }
 let IDEAS=null,LEARN=null;
 const ft=(fx,t)=>esc(String(t).split(fx.home).join(zn(fx.home)).split(fx.away).join(zn(fx.away)));

@@ -347,10 +347,46 @@ def group_stats(rows, kind):
     return out
 
 
-def aggregate(data_dir):
+def fd_ah_rows(fdrows):
+    """football-data matches (Pinnacle early-week vs closing Asian line, 2019+) in the board's row shape."""
+    def sup(line, odds):
+        if not odds:
+            return None
+        inv = [1 / x for x in odds]
+        return round(-line + (inv[0] / sum(inv) - 0.5) * 3.8, 3)
+    out = []
+    for r in fdrows:
+        if r.get("ah") is None or r.get("ahc") is None or not r.get("ahco"):
+            continue
+        out.append({"hs": r["hg"], "as": r["ag"], "t": r["d"],
+                    "ah": {"ol": r["ah"], "cl": r["ahc"], "codds": r["ahco"], "osup": sup(r["ah"], r.get("aho")),
+                           "csup": sup(r["ahc"], r["ahco"])}})
+    return out
+
+
+def aggregate(data_dir, tmap=None, fd=None):
+    """All leagues together, plus each league on its own (the board's rows by tournament, and football-data's
+    Asian lines for the leagues it covers)."""
     rows = load_rows(data_dir)
-    return {"n": len(rows), "since": min((r["t"] for r in rows), default=None),
-            "ou": group_stats(rows, "ou"), "ah": group_stats(rows, "ah")}
+    out = {"n": len(rows), "since": min((r["t"] for r in rows), default=None),
+           "ou": group_stats(rows, "ou"), "ah": group_stats(rows, "ah"), "leagues": {}, "fd": {}}
+    by = {}
+    for r in rows:
+        lg = (tmap or {}).get(str(r.get("tid") or ""))
+        if lg:
+            by.setdefault(lg, []).append(r)
+    for lg, rs in by.items():
+        out["leagues"][lg] = {"n": len(rs), "ou": group_stats(rs, "ou"), "ah": group_stats(rs, "ah")}
+    if fd is not None:
+        allr = []
+        for lg, frs in fd.rows.items():
+            rs = fd_ah_rows(frs)
+            if len(rs) >= 200:
+                out["fd"][lg] = {"n": len(rs), "since": min(r["t"] for r in rs), "ah": group_stats(rs, "ah")}
+                allr += rs
+        if allr:
+            out["fd"]["全部"] = {"n": len(allr), "since": min(r["t"] for r in allr), "ah": group_stats(allr, "ah")}
+    return out
 
 
 def lookup(agg, fx):

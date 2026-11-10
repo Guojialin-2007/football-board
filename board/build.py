@@ -344,7 +344,7 @@ def run(inspect=False, log=print):
                    allowed=set(tmap) if tmap else None)
     except Exception as e:                 # noqa: BLE001  never lose the board because of the history job
         log(f"[history] backfill stopped: {type(e).__name__}: {str(e)[:160]}")
-    agg = H.aggregate(DATA)
+    agg = H.aggregate(DATA, tmap, fdx)
     json.dump(agg, open(os.path.join(SITE, "history.json"), "w"), ensure_ascii=False)
     out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards,
            "repo": os.environ.get("GITHUB_REPOSITORY", ""),
