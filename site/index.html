@@ -11,13 +11,13 @@
   --bg:#f2f5f2; --panel:#ffffff; --panel2:#f4f7f4; --line:#dde4de; --text:#16231c; --muted:#56645c; --faint:#8a978f;
   --brand:#1d3552; --brand-ink:#f4f7fb;
   --up:#cf3b2f; --down:#17864a; --home:#b57a12; --away:#5b4fc4; --good:#17864a; --warn:#b57a12;
-  --radius:12px; --num:"Barlow Semi Condensed","DIN Alternate","Roboto Condensed",system-ui,sans-serif;
+  --gold:#f2c14e; --hbar:#1d3552; --dbar:#b6c0ba; --radius:12px; --num:"Barlow Semi Condensed","DIN Alternate","Roboto Condensed",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#0f1613; --panel:#16201b; --panel2:#1c2822; --line:#2a3832; --text:#e3ebe6; --muted:#9aa9a1; --faint:#6c7b73;
     --brand:#21395a; --brand-ink:#eef3f9;
-    --up:#ff6b5c; --down:#3fc47a; --home:#e3a73a; --away:#9d93ff; --good:#3fc47a; --warn:#e3a73a;
+    --hbar:#7fa8e0; --dbar:#55635c; --up:#ff6b5c; --down:#3fc47a; --home:#e3a73a; --away:#9d93ff; --good:#3fc47a; --warn:#e3a73a;
   }
 }
 *{box-sizing:border-box}
@@ -115,7 +115,7 @@ details[open] summary::before{content:"▾ "}
 @media (max-width:420px){.grid{grid-template-columns:1fr}.mk{grid-template-columns:46px minmax(0,1fr) 64px}.spark{width:64px}.row .lbl{min-width:44px}}
 .dmeta{color:var(--muted);font-size:13.5px;margin-top:2px;padding-right:70px}
 .dteams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:12px 0 14px;font-size:21px;font-weight:700;line-height:1.25}
-.dteams .a{text-align:right}.dteams .en{font-size:12.5px;margin-top:3px}
+.dteams .a{text-align:right}.dteams .a .form{justify-content:flex-end}.dteams .en{font-size:12.5px;margin-top:3px}
 .nav{margin-top:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .navrow{display:grid;grid-template-columns:96px 1fr auto;gap:12px;align-items:center;width:100%;padding:14px 14px;background:transparent;border:0;border-top:1px solid var(--line);color:var(--text);font:inherit;text-align:left;cursor:pointer}
 .navrow:first-child{border-top:0}.navrow:hover{background:var(--panel2)}
@@ -242,28 +242,124 @@ details summary{font-size:13px}
 :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 @media (max-width:640px){.bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding-left:16px;padding-right:16px}.bar::-webkit-scrollbar{display:none}.bar input{min-width:150px;flex:0 0 150px}.bar select{flex:0 0 auto}.chip{flex:0 0 auto;white-space:nowrap}.top{padding-bottom:6px}.stats{margin-left:0;width:100%}}
 @media (max-width:420px){.ktime{font-size:15px}.tm{font-size:16px}.mk{grid-template-columns:44px minmax(0,1fr) 60px}}
+
+/* ---------- v3：标签页、今日要点、卡片重排 ---------- */
+.top{padding:12px 0 4px;gap:6px 12px;align-items:baseline}
+.gen{font-size:13px;color:color-mix(in srgb,var(--brand-ink) 65%,transparent)}
+.gen.stale{color:var(--gold);font-weight:600}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 10px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;background:none;border:0;border-bottom:3px solid transparent;color:color-mix(in srgb,var(--brand-ink) 72%,transparent);font:inherit;font-size:15px;padding:9px 12px 8px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--brand-ink)}
+.tab.on{color:var(--brand-ink);font-weight:700;border-bottom-color:var(--gold)}
+.hlband{background:var(--brand);color:var(--brand-ink);padding:14px 0 16px;border-top:1px solid color-mix(in srgb,var(--brand-ink) 12%,transparent)}
+.hlt{font-size:15px;font-weight:700;margin-bottom:9px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.hlt span{font-weight:400;font-size:13px;opacity:.7}
+.hls{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px}
+.hl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 12px;align-items:center;text-align:left;background:color-mix(in srgb,var(--brand-ink) 9%,transparent);border:1px solid color-mix(in srgb,var(--brand-ink) 18%,transparent);border-radius:10px;padding:10px 13px;color:inherit;font:inherit;cursor:pointer;min-width:0}
+.hl:hover{background:color-mix(in srgb,var(--brand-ink) 16%,transparent)}
+.hl>span{grid-column:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hlk{font-size:12.5px;font-weight:700;color:var(--gold)}.hlk.m{color:#ffb0a6}
+.hlm{font-size:16px;font-weight:700}
+.hls2{font-size:13px;opacity:.75}
+.hl>.hln{grid-column:2;grid-row:1/5;font-family:var(--num);font-size:27px;font-weight:700;color:var(--gold);overflow:visible}
+.hln.up{color:#ff9488}.hln.down{color:#6fdc9c}
+.hlnone{font-size:14px;opacity:.8}
+main{padding-top:0}
+main .bar{padding:14px 0 0;align-items:center}
+main .bar input,main .bar select{background:var(--panel);border:1px solid var(--line);color:var(--text)}
+main .bar input::placeholder{color:var(--faint)}
+main .chip{background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+main .chip:hover{border-color:var(--muted)}
+main .chip.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel);flex:0 0 auto}
+.seg button{background:none;border:0;border-left:1px solid var(--line);padding:8px 13px;font:inherit;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--brand);color:var(--brand-ink);font-weight:600}
+.seg button b{font-family:var(--num);margin-left:5px;font-weight:600;opacity:.75}
+.card{box-shadow:0 1px 2px rgba(22,35,28,.06)}
+.card.hot{border-color:var(--line);box-shadow:inset 4px 0 0 var(--up),0 1px 2px rgba(22,35,28,.06)}
+.lgpill{display:inline-block;background:color-mix(in srgb,var(--hbar) 12%,transparent);color:var(--hbar);font-weight:700;font-size:13px;padding:1px 8px;border-radius:5px;white-space:nowrap}
+.cd{display:inline-block;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:12.5px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--muted);margin-left:8px;vertical-align:2px}
+.cd.soon{background:color-mix(in srgb,var(--up) 13%,transparent);color:var(--up)}
+.card>.rb,.rb{margin:0 14px 10px;border-radius:9px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.rb.go{background:var(--brand);color:var(--brand-ink)}
+.rtag{font-size:12px;font-weight:700;background:var(--gold);color:#22190a;border-radius:4px;padding:1px 6px;margin-right:8px;vertical-align:2px}
+.rbl{min-width:0}.rbl b{font-size:18px}
+.rodd{font-family:var(--num);font-size:19px;font-weight:600;margin-left:8px;white-space:nowrap}.rodd small{font-size:12.5px;opacity:.72;margin-left:5px;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;font-weight:400}
+.rbs{display:block;font-size:12.5px;opacity:.75;margin-top:1px}
+.rbr{text-align:right;line-height:1.1;white-space:nowrap}.rbr b{font-family:var(--num);font-size:25px;color:var(--gold);display:block}.rbr small{font-size:11.5px;opacity:.72}
+.card>.rb.no,.rb.no{background:var(--panel2);color:var(--muted);font-size:13.5px;flex-wrap:wrap;gap:0 10px;padding:6px 12px;justify-content:flex-start}
+.rb.no b{color:var(--text);font-weight:600}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-bottom:10px}
+.tile{background:var(--panel2);border-radius:9px;padding:8px 10px 7px;min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 6px;align-items:center}
+.tl{font-size:12.5px;color:var(--muted);font-weight:600}
+.tile .mv{margin-left:0;justify-self:end}
+.mv.flat{background:transparent;color:var(--faint);padding:0;font-weight:500}
+.tv{font-family:var(--num);font-size:27px;font-weight:700;line-height:32px;white-space:nowrap}
+.tv.cjk{font-family:inherit;font-size:20px}
+.tile .spark{width:62px;height:26px;justify-self:end}
+.to{grid-column:1/-1;font-size:12.5px;color:var(--muted);font-family:var(--num);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.to b{color:var(--text);font-weight:600}.to .up,.to .down{font-weight:700}
+.pb{padding-bottom:11px}
+.pbar{display:flex;height:9px;border-radius:5px;overflow:hidden;gap:2px;margin-bottom:5px}
+.pbar i{display:block}.pbar .h{background:var(--hbar)}.pbar .d{background:var(--dbar)}.pbar .a{background:var(--away)}
+.pbx{display:grid;grid-template-columns:repeat(3,1fr);font-size:12.5px;color:var(--muted);line-height:1.3}
+.pbx>div:nth-child(2){text-align:center}.pbx>div:nth-child(3){text-align:right}
+.pbx b{font-family:var(--num);font-size:20px;color:var(--text);margin:0 2px 0 4px;font-weight:700}
+.pbx em{font-style:normal;font-family:var(--num);font-size:12.5px;font-weight:700}
+.pbx small{display:block;font-family:var(--num);font-size:12.5px;color:var(--faint)}
+.pbx .k1::before,.pbx .k3::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+.pbx .k1::before{background:var(--hbar)}.pbx .k3::before{background:var(--away)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:11px}
+.tag{font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:5px;background:var(--panel2);color:var(--muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.tag.l2{background:color-mix(in srgb,var(--warn) 15%,transparent);color:color-mix(in srgb,var(--warn) 72%,var(--text))}
+.tag.l3{background:var(--up);color:#fff}
+.cfoot{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:8px;padding-bottom:9px;font-size:13px;color:var(--muted);margin-top:auto}
+.cfoot span:last-child{color:var(--hbar);font-weight:600;white-space:nowrap}
+.card.bare .teams{padding-bottom:6px}
+.card .noodds{font-size:13.5px;color:var(--muted);padding-bottom:12px}
+.tm .form{margin-top:5px}
+#dlg .rb{margin:0 0 12px;padding:12px 16px}#dlg .rb.go .rbl b{font-size:21px}#dlg .rbr b{font-size:30px}
+#dlg .tiles{gap:10px}#dlg .tile{padding:11px 14px 10px}#dlg .tv{font-size:31px;line-height:38px}#dlg .tv.cjk{font-size:23px}#dlg .to{font-size:13.5px;white-space:normal}
+#dlg .tile .spark{width:110px;height:36px}
+#dlg .pbx b{font-size:24px}#dlg .pbx,#dlg .pbx small,#dlg .pbx em{font-size:13.5px}#dlg .pbar{height:11px}
+#dlg .dmeta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.dsec{font-size:13.5px;font-weight:700;color:var(--muted);margin:16px 0 6px}
+#dlg .flags{background:transparent;border-top:0;padding:0}#dlg .flag{background:var(--panel2)}#dlg .flag.l3{background:color-mix(in srgb,var(--up) 9%,var(--panel))}
+.ns{color:var(--text)}
+.navrow{padding:13px 14px}
+@media (max-width:640px){.hls{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:0 16px;scrollbar-width:none}.hls::-webkit-scrollbar{display:none}.hl{flex:0 0 80%;scroll-snap-align:start}.stats{display:none}
+  main .bar{margin:0 -16px}.tabs{padding:0 6px}.tab{padding:9px 10px 8px}}
+@media (max-width:420px){.tv{font-size:24px}.tv.cjk{font-size:18px}.tile .spark{width:48px}.pbx b{font-size:18px}.rbr b{font-size:22px}.rbl b,.rodd{font-size:17px}}
+@media (max-width:560px){#dlg{padding:10px 8px}#dlg .box{padding:16px 14px 22px}#dlg .tile .spark{width:56px}#dlg .tv{font-size:26px}#dlg .tv.cjk{font-size:19px}#dlg .pbx b{font-size:20px;display:inline-block}}
 </style>
 </head>
 <body>
 <header><div class="wrap">
   <div class="top">
-    <h1>赛前盘口看板<span id="gen"></span></h1>
+    <h1>赛前盘口看板</h1><span id="gen" class="gen"></span>
     <div class="stats" id="stats"></div>
   </div>
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-v="board">比赛</button>
+    <button class="tab" data-v="jcPanel">竞彩计算</button>
+    <button class="tab" data-v="hist">历史规律</button>
+    <button class="tab" data-v="rulesPanel">规律库</button>
+    <button class="tab" data-v="trackPanel">信号战绩</button>
+    <button class="tab" data-v="ideasPanel">思路战绩</button>
+  </nav>
+</div></header>
+<section class="hlband" id="hlband" hidden><div class="wrap" id="hl"></div></section>
+<div id="dlg"><div class="box" id="dlgBox"></div></div>
+<main class="wrap"><div id="hist" hidden></div><div id="jcPanel" class="panel" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="board">
   <div class="bar">
     <input id="q" placeholder="搜索球队或联赛">
     <select id="lg"><option value="">全部联赛</option></select>
-    <span class="chip" id="onlyFlags">只看有信号</span>
+    <span class="seg" id="filt"><button class="on" data-f="all">全部</button><button data-f="reco">有推荐</button><button data-f="sig">有信号</button><button data-f="move">盘口变了</button></span>
     <span class="chip" id="sortScore">按信号强度排序</span>
-    <span class="chip" id="histTab">历史规律</span>
-    <span class="chip" id="jcTab">竞彩计算</span>
-    <span class="chip" id="rulesTab">规律库</span>
-    <span class="chip" id="trackTab">信号战绩</span>
-    <span class="chip" id="ideasTab">思路战绩</span>
   </div>
-</div></header>
-<div id="dlg"><div class="box" id="dlgBox"></div></div>
-<main class="wrap"><div id="hist" hidden></div><div id="jcPanel" class="panel" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="list"><div class="empty">加载中…</div></div>
+  <div id="list"><div class="empty">加载中…</div></div></div>
 <div class="note">数据：OddsPapi 盘口（Pinnacle 为参考）、ESPN 赛果、football-data 历史。每小时更新。只提供信息，不是投注建议。</div></main>
 <script>
 const $=s=>document.querySelector(s);
@@ -271,7 +367,7 @@ let ZH={};
 const zn=x=>ZH[x]||x;
 const zb=x=>ZH[x]?`${esc(ZH[x])}<span class="en">${esc(x)}</span>`:esc(x);
 const zi=x=>ZH[x]?`${esc(ZH[x])}<span class="en il">${esc(x)}</span>`:esc(x);
-let DATA=null,onlyFlags=false,sortScore=false;
+let DATA=null,sortScore=false;
 const fmtT=t=>new Date(t*1000).toLocaleString("zh-CN", {month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
 const hm=t=>new Date(t*1000).toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false});
 const dmd=t=>{const d=new Date(t*1000);return `${d.getMonth()+1}/${d.getDate()}`};
@@ -326,34 +422,117 @@ function statsBlock(fx){
   ${statRow("零封",h.all,a.all,s=>pct(s.cs))}</table>
   <div class="last"><div><div class="sub">${zi(fx.home)} 最近 5 场</div>${last(h.all)}</div><div><div class="sub">${zi(fx.away)} 最近 5 场</div>${last(a.all)}</div></div></details>`;
 }
+const refOf=fx=>fx.books.pinnacle||Object.values(fx.books)[0];
+function kick(fx){
+  const s=fx.start-Date.now()/1000;
+  if(s<=0)return["已开赛","soon"];
+  if(s<3600)return[Math.max(1,Math.round(s/60))+" 分钟后","soon"];
+  if(s<86400){const h=s/3600;return[(h<10?String(Math.round(h*2)/2):Math.round(h))+" 小时后",h<3?"soon":""]}
+  return[Math.floor(s/86400)+" 天后",""];
+}
+const cdHTML=fx=>{const [t,c]=kick(fx);return `<span class="cd ${c}">${t}</span>`};
+function flatOr(b,d,eps,txt){return b||(Math.abs(d)>=eps?`<span class="mv ${d>0?"up":"down"}">${d>0?"▲":"▼"} ${txt}</span>`:`<span class="mv flat">没变</span>`)}
+function tiles(ref,big){
+  const ou=ref.ou,ah=ref.ah,f2=x=>x.toFixed(2);let h="";
+  if(ou){const o=ou.open,n=ou.now,dl=(n.lam||0)-(o.lam||0),has=o.lam&&n.lam;
+    h+=`<div class="tile"><span class="tl">大小球</span>${flatOr(badge(Math.round((n.line-o.line)*4),"升","降"),has?dl:0,0.05,"预期 "+sgn(dl.toFixed(2)))}
+    <span class="tv">${n.line}</span>${spark(ou.series,"var(--up)")||"<span></span>"}
+    <span class="to">开盘 <b>${o.line}</b></span><span class="to">大 ${f2(n.odds[0])} / 小 ${f2(n.odds[1])}</span>
+    ${big&&has?`<span class="to">市场预期进球 ${f2(o.lam)} → <b class="${dirCls(dl,0.05)}">${f2(n.lam)}</b>　变盘 ${ou.changes} 次</span>`:""}</div>`}
+  if(ah){const o=ah.open,n=ah.now,ds=(n.sup||0)-(o.sup||0),has=o.sup!=null&&n.sup!=null,sg=x=>sgn(x.toFixed(2));
+    h+=`<div class="tile"><span class="tl">亚盘（主队）</span>${flatOr(badge(ahUpSteps(o.line,n.line),"升","降"),has?ds:0,0.05,"预期 "+sg(ds))}
+    <span class="tv cjk">${ahLine(n.line)}</span>${spark(ah.series,"var(--home)")||"<span></span>"}
+    <span class="to">开盘 <b>${ahLine(o.line)}</b></span><span class="to">主 ${f2(n.odds[0])} / 客 ${f2(n.odds[1])}</span>
+    ${big&&has?`<span class="to">主队净胜球预期 ${sg(o.sup)} → <b class="${dirCls(ds,0.05)}">${sg(n.sup)}</b></span>`:""}</div>`}
+  return h?`<div class="tiles">${h}</div>`:"";
+}
+function probBar(m){
+  if(!m)return"";const o=m.open.p,n=m.now.p,lab=["主胜","平局","客胜"],cl=["h","d","a"];
+  const chg=i=>{const d=Math.round((n[i]-o[i])*100);return d?`<em class="${d>0?"up":"down"}">${d>0?"▲":"▼"}${Math.abs(d)}</em>`:""};
+  return `<div class="pb"><div class="pbar">${n.map((p,i)=>`<i class="${cl[i]}" style="flex:${Math.max(p,0.02)}"></i>`).join("")}</div>
+  <div class="pbx">${n.map((p,i)=>`<div><span class="k${i+1}">${lab[i]}</span><b>${pct(p)}</b>${chg(i)}<small>赔率 ${m.now.odds[i].toFixed(2)}</small></div>`).join("")}</div></div>`;
+}
+function recoBand(fx){
+  const r=fx.reco;if(!r||!refOf(fx))return"";
+  const i=r.pick_i,b=r.best&&r.best[i],ev=r.ev&&r.ev[i];
+  if(i==null||!b||ev==null)return `<div class="rb ${r.go?"go":"no"}">${esc(r.text||"")}</div>`;
+  const evt=sgn((ev*100).toFixed(1))+"%";
+  if(r.go)return `<div class="rb go"><div class="rbl"><span class="rtag">推荐</span><b>${esc(r.pick)}</b><span class="rodd">${b[0].toFixed(2)}<small>${esc(b[1])}</small></span>${r.p?`<span class="rbs">综合概率 ${pct(r.p[i])}${r.p_market?"，市场 "+pct(r.p_market[i]):""}</span>`:""}</div><div class="rbr"><b>${evt}</b><small>期望回报</small></div></div>`;
+  return `<div class="rb no"><b>不推荐下注</b><span>最接近的是${esc(r.pick)} ${b[0].toFixed(2)}，期望 ${evt}</span></div>`;
+}
+function tagTxt(f){
+  if(f.k==="ou")return f.dir==="up"?"盘口往大球走":"盘口往小球走";
+  if(f.k==="ah")return f.dir==="home"?"资金流向主队":"资金流向客队";
+  if(f.k==="1x2")return ({home:"主胜",draw:"平局",away:"客胜"})[f.dir]+"概率变化大";
+  if(f.k==="value")return `价格机会：${f.dir||""} ${f.book||""} ${f.odds?f.odds.toFixed(2):""}${f.ev?"（高 "+(f.ev*100).toFixed(0)+"%）":""}`;
+  if(f.k==="form")return f.dir==="up"?"近况偏大球":"近况偏小球";
+  if(f.k==="conflict")return "近况和盘口方向相反";
+  return null;
+}
+function tagsHTML(fx,n){
+  const ts=fx.flags.map(f=>[f.lv,tagTxt(f)]).filter(x=>x[1]).sort((a,b)=>b[0]-a[0]).slice(0,n);
+  return ts.length?`<div class="tags">${ts.map(([lv,t])=>`<span class="tag l${lv}">${esc(t)}</span>`).join("")}</div>`:"";
+}
+function moveOf(fx){
+  const r=refOf(fx);if(!r)return null;const out=[];
+  if(r.ah){const k=ahUpSteps(r.ah.open.line,r.ah.now.line);if(k)out.push([`亚盘 ${ahLine(r.ah.open.line)} → ${ahLine(r.ah.now.line)}`,k])}
+  if(r.ou){const k=Math.round((r.ou.now.line-r.ou.open.line)*4);if(k)out.push([`大小球 ${r.ou.open.line} → ${r.ou.now.line}`,k])}
+  return out.sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0]||null;
+}
 function cardHTML(fx){
-  const ref=fx.books.pinnacle||Object.values(fx.books)[0];
-  const bk=Object.keys(fx.books);
-  const flags=topFlags(fx,3);
-  return `<div class="card ${fx.score>=3?"hot":""}" data-id="${esc(fx.id)}">
-   <div class="meta"><span class="lgtag">${esc(fx.league)}${fx.country?`<span class="cty">${esc(zn(fx.country))}</span>`:""}</span><span class="ktime"><small>${dmd(fx.start)}</small>${hm(fx.start)}</span></div>
+  const ref=refOf(fx),nb=Object.keys(fx.books).length,nf=fx.flags.length;
+  return `<div class="card ${fx.score>=3?"hot":""} ${ref?"":"bare"}" data-id="${esc(fx.id)}">
+   <div class="meta"><span class="lgtag"><span class="lgpill">${esc(fx.league)}</span>${fx.country?`<span class="cty">${esc(zn(fx.country))}</span>`:""}</span><span class="ktime">${sortScore?`<small>${dmd(fx.start)}</small>`:""}${hm(fx.start)}${cdHTML(fx)}</span></div>
    <div class="teams"><div class="tm">${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
-   ${ref?`<div class="mkt">${mkOU(ref.ou)+mkAH(ref.ah)+mk12(ref["1x2"])}</div>`:`<div class="sub">暂无盘口数据</div>`}
-   ${fx.reco?`<div class="reco ${fx.reco.go?"go":""}">${esc(fx.reco.text)}</div>`:""}
-   ${flags}
-   ${statsBlock(fx)}
+   ${ref?recoBand(fx)+tiles(ref)+probBar(ref["1x2"])+tagsHTML(fx,4):`<div class="noodds">盘口还没开出来，开了以后这里会显示。</div>`}
+   <div class="cfoot"><span>${ref?`${nf?nf+" 条信号":"没有信号"} · ${nb} 家盘口`:"暂无盘口"}</span><span>看详细分析 ›</span></div>
   </div>`;
 }
+function hlHTML(){
+  const now=Date.now()/1000,items=[];
+  for(const fx of DATA.fixtures){
+    if(fx.start<now||!refOf(fx))continue;
+    const nm=`${zn(fx.home)} vs ${zn(fx.away)}`,when=`${fx.league} ${hm(fx.start)}，${kick(fx)[0]}`,r=fx.reco;
+    if(r&&r.go&&r.pick_i!=null&&r.best&&r.ev){const b=r.best[r.pick_i];items.push([0,fx,"推荐",`${nm}`,`买${r.pick} ${b[0].toFixed(2)}（${b[1]}）`,when,sgn((r.ev[r.pick_i]*100).toFixed(1))+"%",""]);continue}
+    const v=fx.flags.filter(f=>f.k==="value"&&f.lv>=3).sort((a,b)=>b.ev-a.ev)[0];
+    if(v){items.push([1,fx,"价格机会",nm,`${v.dir} ${v.odds?v.odds.toFixed(2):""}（${v.book||""}）`,when,"+"+(v.ev*100).toFixed(1)+"%",""]);continue}
+    const m=moveOf(fx);
+    if(m&&fx.score>=3)items.push([2,fx,"盘口大变",nm,m[0],when,(m[1]>0?"▲":"▼")+Math.abs(m[1])+" 档",m[1]>0?"up":"down"]);
+  }
+  items.sort((a,b)=>a[0]-b[0]||a[1].start-b[1].start);
+  const n=[0,1,2].map(k=>items.filter(x=>x[0]===k).length);
+  if(!items.length)return `<div class="hlnone">现在没有达到推荐门槛的比赛，也没有盘口大变的比赛。下面是全部赛程。</div>`;
+  return `<div class="hlt">现在最值得看<span>${[n[0]&&n[0]+" 个推荐",n[1]&&n[1]+" 个价格机会",n[2]&&n[2]+" 场盘口大变"].filter(Boolean).join(" · ")}</span></div>
+  <div class="hls">${items.slice(0,8).map(x=>`<button class="hl" onclick="openDlg('${esc(x[1].id)}')"><span class="hlk ${x[0]===2?"m":""}">${x[2]}</span><span class="hlm">${esc(x[3])}</span><span class="hls2">${esc(x[4])}</span><span class="hls2">${esc(x[5])}</span><span class="hln ${x[7]}">${x[6]}</span></button>`).join("")}</div>`;
+}
+let FILT="all",VIEW="board";
+function setView(v){
+  VIEW=v;["board","jcPanel","hist","rulesPanel","trackPanel","ideasPanel"].forEach(id=>$("#"+id).hidden=id!==v);
+  $("#hlband").hidden=v!=="board"||!DATA;
+  document.querySelectorAll("#tabs .tab").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  if(v==="jcPanel")renderJC();
+  window.scrollTo(0,0);
+}
+const FILTS={all:()=>true,reco:f=>f.reco&&f.reco.go&&!!refOf(f),sig:f=>f.flags.length>0,move:f=>!!moveOf(f)};
 function render(){
   if(!DATA) return;
   const q=$("#q").value.trim().toLowerCase(),lg=$("#lg").value;
-  let xs=DATA.fixtures.filter(f=>(!lg||f.league===lg)&&(!onlyFlags||f.flags.length)&&(!q||(f.home+f.away+zn(f.home)+zn(f.away)+f.league+f.country+zn(f.country)).toLowerCase().includes(q)));
-  if(!xs.length){$("#list").innerHTML=`<div class="empty">没有符合条件的比赛</div>`;return}
+  document.querySelectorAll("#filt button").forEach(b=>{const k=b.dataset.f;b.classList.toggle("on",k===FILT);const c=DATA.fixtures.filter(FILTS[k]).length;b.innerHTML=b.textContent.replace(/\d+$/,"")+`<b>${c}</b>`});
+  let xs=DATA.fixtures.filter(f=>(!lg||f.league===lg)&&FILTS[FILT](f)&&(!q||(f.home+f.away+zn(f.home)+zn(f.away)+f.league+f.country+zn(f.country)).toLowerCase().includes(q)));
+  if(!xs.length){$("#list").innerHTML=`<div class="empty">没有符合条件的比赛。换一个筛选条件试试。</div>`;return}
   if(sortScore){xs=[...xs].sort((a,b)=>b.score-a.score||a.start-b.start);$("#list").innerHTML=`<div class="grid">${xs.map(cardHTML).join("")}</div>`;return}
-  const groups={};xs.forEach(f=>(groups[dayKey(f.start)]??=[]).push(f));
+  const today=dayKey(Date.now()/1000),tmr=dayKey(Date.now()/1000+86400),dl=d=>d===today?"今天 · "+d:d===tmr?"明天 · "+d:d;
+  const groups={};xs.forEach(f=>(groups[dl(dayKey(f.start))]??=[]).push(f));
   $("#list").innerHTML=Object.entries(groups).map(([d,fs])=>`<div class="day">${d} · ${fs.length} 场</div><div class="grid">${fs.map(cardHTML).join("")}</div>`).join("");
 }
 function init(d){
   DATA=d;
-  $("#gen").textContent="更新于 "+fmtT(d.generated);
+  {const age=Math.max(0,Math.round((Date.now()/1000-d.generated)/60)),g=$("#gen");
+  g.textContent=`${fmtT(d.generated)} 更新（${age<60?age+" 分钟前":age<2880?Math.round(age/60)+" 小时前":Math.round(age/1440)+" 天前"}${age>150?"，数据可能过时":""}）`;g.classList.toggle("stale",age>150)}
   const s=d.summary;
   const ORDER={};(d.leagues||[]).forEach((x,i)=>ORDER[x.league]=i);
   $("#stats").innerHTML=`<span><b>${s.fixtures}</b>场比赛</span><span><b>${s.with_odds}</b>有盘口</span><span><b>${s.flags}</b>有信号</span>`;
+  $("#hl").innerHTML=hlHTML();$("#hlband").hidden=VIEW!=="board";
   const lgs={};d.fixtures.forEach(f=>lgs[f.league]=(lgs[f.league]||0)+1);
   $("#lg").innerHTML=`<option value="">全部联赛（${d.fixtures.length}）</option>`+Object.entries(lgs).sort((a,b)=>((ORDER[a[0]]??99)-(ORDER[b[0]]??99))||b[1]-a[1]).map(([l,n])=>`<option value="${esc(l)}">${esc(l)}（${n}）</option>`).join("");
   render();
@@ -550,7 +729,6 @@ function renderJC(){
   <h3>4. 已冻结方案的战绩</h3>${jcPlansHTML()}`;
 }
 fetch("jcplans.json?"+Date.now()).then(r=>r.json()).then(x=>{JC.plans=x;if(!$("#jcPanel").hidden)renderJC()}).catch(()=>{});
-$("#jcTab").onclick=e=>{const on=$("#jcPanel").hidden;$("#jcPanel").hidden=!on;e.target.classList.toggle("on",on);if(on)renderJC()};
 
 function renderRules(x){
   if(!x){$("#rulesPanel").innerHTML=`<h2>规律库</h2><p>还没有数据。</p>`;return}
@@ -564,7 +742,6 @@ function renderRules(x){
     const sides=Object.entries(r.sides).map(([s,v])=>`买${s} ${cell(v.dev)}`).join("<br>"),sides2=Object.entries(r.sides).map(([s,v])=>`买${s} ${cell(v.val)}`).join("<br>");
     return `<tr><td><b>${esc(k)}</b><div class="sub">${esc(r.what)}</div></td><td>${MK[r.market]}</td><td>${esc(r.claim||"—")}</td><td><span class="vtag ${VC[r.verdict]}">${r.verdict}</span><div class="sub" style="white-space:normal;min-width:180px">${esc(r.text)}</div></td><td>${sides}</td><td>${sides2}</td></tr>`}).join("")}</table></div>`;
 }
-$("#rulesTab").onclick=e=>{const on=$("#rulesPanel").hidden;$("#rulesPanel").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("rules.json?"+Date.now()).then(r=>r.json()).then(renderRules).catch(()=>renderRules(null));
 function renderTrack(x){
   if(!x){$("#trackPanel").innerHTML=`<h2>信号战绩</h2><p>还没有数据。</p>`;return}
@@ -755,11 +932,12 @@ const SECS=[
 ];
 function detailHTML(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];
-  let h=`<button class="x" onclick="closeDlg()">关闭</button><div class="dmeta">${fx.country?zi(fx.country)+" · ":""}${esc(fx.league)} · ${fmtT(fx.start)}</div>
-  <div class="dteams"><div>${zb(fx.home)}</div><span class="vs">VS</span><div class="a">${zb(fx.away)}</div></div>`;
-  h+=ref?[mkOU(ref.ou),mkAH(ref.ah),mk12(ref["1x2"])].map(x=>x.replace('<div class="mk">','<div class="mk big">').replace(/<svg class="spark"[\s\S]*?<\/svg>/,"")).join(""):`<div class="hint">暂无盘口数据</div>`;
-  h+=`<div style="margin-top:12px">${topFlags(fx,3)}</div>`;
-  h+=`<div class="nav">${SECS.map(([k,t,sum])=>`<button class="navrow" onclick="openSec('${esc(fx.id)}','${k}')"><span class="nt">${t}</span><span class="ns">${esc(sum(fx))}</span><span class="na">›</span></button>`).join("")}</div>`;
+  let h=`<button class="x" onclick="closeDlg()">关闭</button><div class="dmeta"><span class="lgpill">${esc(fx.league)}</span>${fx.country?`<span>${esc(zn(fx.country))}</span>`:""}<span class="num">${fmtT(fx.start)}</span>${cdHTML(fx)}</div>
+  <div class="dteams"><div>${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><span class="vs">VS</span><div class="a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>`;
+  h+=ref?recoBand(fx)+tiles(ref,true)+probBar(ref["1x2"]):`<div class="hint">盘口还没开出来。</div>`;
+  const tf=topFlags(fx,3);if(tf)h+=`<div class="dsec">主要信号</div>${tf}`;
+  h+=`<div class="dsec">点开看每一项</div>`;
+  h+=`<div class="nav" style="margin-top:0">${SECS.map(([k,t,sum])=>`<button class="navrow" onclick="openSec('${esc(fx.id)}','${k}')"><span class="nt">${t}</span><span class="ns">${esc(sum(fx))}</span><span class="na">›</span></button>`).join("")}</div>`;
   return h;
 }
 function openSec(id,key){
@@ -789,14 +967,12 @@ function renderIdeas(x){
   <h3>按玩法</h3><div class="kv">${Object.entries((x&&x.market)||{}).map(([k,v])=>`<span>${k}：${rec(v)}</span>`).join("")}</div>
   <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}${learnHTML()}`;
 }
-$("#trackTab").onclick=e=>{const on=$("#trackPanel").hidden;$("#trackPanel").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("track.json?"+Date.now()).then(r=>r.json()).then(renderTrack).catch(()=>renderTrack(null));
-$("#ideasTab").onclick=e=>{const on=$("#ideasPanel").hidden;$("#ideasPanel").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("learn.json?"+Date.now()).then(r=>r.json()).then(x=>LEARN=x).catch(()=>{}).then(()=>fetch("ideas.json?"+Date.now())).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
-$("#histTab").onclick=e=>{const on=$("#hist").hidden;$("#hist").hidden=!on;e.target.classList.toggle("on",on)};
 fetch("history.json?"+Date.now()).then(r=>r.json()).then(renderHist).catch(()=>renderHist(null));
 $("#q").oninput=render;$("#lg").onchange=render;
-$("#onlyFlags").onclick=e=>{onlyFlags=!onlyFlags;e.target.classList.toggle("on",onlyFlags);render()};
+$("#filt").onclick=e=>{const b=e.target.closest("button");if(!b)return;FILT=b.dataset.f;render()};
+$("#tabs").onclick=e=>{const b=e.target.closest(".tab");if(b)setView(b.dataset.v)};
 $("#sortScore").onclick=e=>{sortScore=!sortScore;e.target.classList.toggle("on",sortScore);render()};
 fetch("zh.json?"+Date.now()).then(r=>r.json()).then(z=>ZH=z).catch(()=>{}).then(()=>fetch("data.json?"+Date.now())).then(r=>r.json()).then(init).catch(()=>$("#list").innerHTML=`<div class="empty">还没有数据：第一次自动运行完成后这里会显示比赛。</div>`);
 </script>
