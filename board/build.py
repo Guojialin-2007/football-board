@@ -212,13 +212,15 @@ def run(inspect=False, log=print):
         mode = "all"
     if mode == "list" and m.get("tours"):
         tmap = LG.match(m["tours"], log=log)
-        top = [{"league": n, "volume": None} for n, _, _ in LG.RULES]
+        top = [{"league": n, "volume": None} for n in LG.shown_names()]
     elif mode == "poly":
         top, tmap = P.load(DATA, fxs, log=log)
     if tmap:
         kept = [f for f in fxs if str(f.get("tournamentId")) in tmap]
         for f in kept:
             f["_pm"] = tmap[str(f.get("tournamentId"))]
+            if f["_pm"] == "欧国联":
+                f["_pm"] = LG.nl_tier(f.get("participant1Name"), f.get("participant2Name"))
         log(f"[board] {len(top)} chosen leagues: kept {len(kept)} of {len(fxs)} fixtures")
         fxs = kept
     log(f"[board] {len(fxs)} fixtures in the next {hours:.0f} h; fetching odds for up to {min(max_fx, len(fxs))}")
