@@ -731,11 +731,20 @@ function jcCands(){
       out.push({id,fx,play,o,h,p,od,ev,ok:ev>=0.04,grp:p>=0.5?"A":p>=0.2?"B":"C",why})}}
   return out.sort((a,b)=>b.ev-a.ev);
 }
+function jcLeastBad(cs){
+  const g={};cs.forEach(c=>(g[c.id+"|"+c.play]??=[]).push(c));
+  const rows=Object.values(g).filter(x=>x.length>=2).map(x=>{x.sort((a,b)=>b.ev-a.ev);const b=x[0],w=x[x.length-1],nm=c=>`<b>${esc(c.o)}</b> <span class="num">${c.od}</span>（<span class="neg">${(c.ev*100).toFixed(1)}%</span>）`;
+    return `<tr><td>${esc(zn(b.fx.home))} vs ${esc(zn(b.fx.away))}</td><td>${esc(b.play)}</td><td>${nm(b)}</td><td>${nm(w)}</td><td>${((b.ev-w.ev)*100).toFixed(1)} 个点</td></tr>`});
+  if(!rows.length)return"";
+  return `<div class="scroll"><table class="ht rt"><tr><th>比赛</th><th>玩法</th><th>最不亏（非买不可就买它）</th><th>最吃亏（被压得最狠，别买）</th><th>两者相差</th></tr>${rows.join("")}</table></div>
+  <div class="hint">“被压得最狠的选项更容易打出”这个说法验过：用 bet365 对 Pinnacle 的 2.8 万场比赛，被压得最狠的选项实际打出 25.7%，Pinnacle 公平概率是 26.0%，没有更容易出；照着买每注亏 13%，比另外两个选项亏得多。压得狠只说明那个选项买的人多、庄家少赔，不说明它更会赢。（竞彩自己的历史赔率拿不到，这是用同类高抽水赔率验的。）</div>`;
+}
 function jcCandsHTML(){
   const cs=jcCands();if(!cs.length)return `<p>在上面填入竞彩赔率后，这里把所有填过的选项分成三类排名，并写明选或拒的理由。</p>`;
   const ok=cs.filter(c=>c.ok),GN={A:"A 高概率（≥50%）",B:"B 平衡（20%～50%）",C:"C 高赔率（<20%）"};
   const age=Math.min(...cs.map(c=>c.fx.jc.at||DATA.generated||0)),hrs=(Date.now()/1000-age)/3600;
-  return `<div class="jverdict ${ok.length?"go":"no"}">${ok.length?`有 ${ok.length} 个合格候选，可以只用它们来组合`:"建议：不买。没有一个选项的竞彩赔率高过 Pinnacle 公平概率 4% 以上"}</div>
+  return `<div class="jverdict ${ok.length?"go":"no"}">${ok.length?`有 ${ok.length} 个合格候选，可以只用它们来组合`:"结论：没有一个选项值得买（都达不到比公平价高 4%）。非买不可的话，看下面每场“最不亏”的那个"}</div>
+  ${ok.length?"":jcLeastBad(cs)}
   <div class="hint">证据等级：${hrs<=2?"一级（Pinnacle 价格是 "+Math.max(0,hrs*60).toFixed(0)+" 分钟内的，请填同一时刻的竞彩赔率）":"二级（Pinnacle 价格已经是 "+hrs.toFixed(1)+" 小时前的，只能作初步参考）"}。扫描的选项越多，越容易碰到"看起来有价差"的巧合，4% 的门槛就是为此设的。</div>
   ${["A","B","C"].map(g=>{const xs=cs.filter(c=>c.grp===g);return xs.length?`<h3>${GN[g]}</h3><div class="scroll"><table class="ht rt"><tr><th>选项</th><th>竞彩赔率</th><th>推算概率</th><th>期望</th><th>取舍</th></tr>${xs.map(c=>`<tr><td>${esc(zn(c.fx.home))} vs ${esc(zn(c.fx.away))}：${esc(c.play==="让球"?`让球(${c.h>0?"+":""}${c.h}) `:c.play==="胜平负"?"":c.play+" ")}${esc(c.o)}</td><td class="num">${c.od}</td><td>${(c.p*100).toFixed(1)}%</td><td class="${evCls(c.ev)}">${(c.ev*100).toFixed(1)}%</td><td class="${c.ok?"pos":"sub"}" style="white-space:normal">${c.why}</td></tr>`).join("")}</table></div>`:""}).join("")}`;
 }
