@@ -304,6 +304,27 @@ def test_jc_plan_settlement():
     print("PASS test_jc_plan_settlement")
 
 
+def test_lean():
+    from board import lean as LN
+    assert LN.side_line("ah", 0, -0.75) == "主队 让半一" and LN.side_line("ah", 1, -0.75) == "客队 受让半一"
+    assert LN.side_line("ou", 1, 2.75) == "小球 2.75"
+    assert LN.ah_dir(-0.5, -0.75) == "home" and LN.ah_dir(-0.5, -0.5, [1.95, 1.95], [1.85, 2.05]) == "flat-home"
+    # 40 earlier league matches where the over came in 70% after the same move -> one vote for the over
+    rows = [{"t": i, "lg": "L", "h": f"h{i}", "a": f"a{i}", "hg": 4 if i % 10 < 7 else 0, "ag": 0, "src": "own",
+             "ou": {"ol": 2.5, "cl": 2.75, "olam": 2.5, "clam": 2.8, "co": [1.95, 1.95]}} for i in range(40)]
+    ix = LN.Index(rows)
+    card = {"league": "L", "home": "X", "away": "Y", "books": {"pinnacle": {"ou": {
+        "open": {"line": 2.5, "lam": 2.5, "odds": [1.95, 1.95]}, "now": {"line": 2.75, "lam": 2.8, "odds": [1.9, 2.0]}}},
+        "soft": {"ou": {"now": {"line": 2.75, "odds": [1.97, 1.9]}}}}}
+    r = LN.for_match(card, ix)["ou"]
+    assert r["side"] == "大球" and r["grade"] >= 1 and r["bet"] == {"what": "大球 2.75", "odds": 1.97, "book": "soft",
+                                                                    "line": 2.75, "side": "over"}, r
+    bt = LN.backtest(rows)
+    assert bt["ou"]["1"]["n"] + bt["ou"]["2"]["n"] + bt["ou"]["3"]["n"] > 0
+    print("PASS test_lean")
+
+
 if __name__ == "__main__":
     test_jc_model()
     test_jc_plan_settlement()
+    test_lean()

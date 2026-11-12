@@ -25,6 +25,7 @@ from . import rules as RL
 from . import jc as JC
 from . import jcplan as JP
 from . import reco as RC
+from . import lean as LN
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -250,6 +251,8 @@ def run(inspect=False, log=print):
     by_league = {}
     for r in rows:
         lg = (tmap or {}).get(str(r.get("tid") or ""))
+        if lg == "欧国联":
+            lg = LG.nl_tier(r.get("home"), r.get("away"))
         r["lgz"] = lg
         if lg:
             by_league.setdefault(lg, []).append(r)
@@ -270,8 +273,22 @@ def run(inspect=False, log=print):
                 f"show something")
     except Exception as e:                 # noqa: BLE001
         log(f"[rules] skipped: {type(e).__name__}: {str(e)[:160]}")
+    lix = None
+    try:                                   # 本场倾向: what history says about a move like this one, per match
+        uni = LN.unified(fdx, rows)
+        lix = LN.Index(uni)
+        lbt = LN.backtest(uni)
+        json.dump(lbt, open(os.path.join(SITE, "lean.json"), "w"), ensure_ascii=False)
+        log(f"[lean] {lix.n} matches indexed; walk-forward record: " + ", ".join(
+            f"{mk} g{g} n={v['n']} win={v['win']} roi={v['roi']}" for mk in ("ah", "ou") for g, v in lbt[mk].items()))
+    except Exception as e:                 # noqa: BLE001
+        log(f"[lean] skipped: {type(e).__name__}: {str(e)[:160]}")
     for c in cards:
         c["detail"] = D.build(c, teams, by_league.get(c["league"], []), fdx, all_rows=rows)
+        try:
+            c["lean"] = LN.for_match(c, lix, fdx) if lix else None
+        except Exception as e:             # noqa: BLE001
+            log(f"[lean] {c['id']}: {type(e).__name__}: {str(e)[:100]}")
         ref = (c.get("books") or {}).get("pinnacle")
         c["detail"]["rules"] = RL.for_match(ref, lib, fdx, c) if lib else []
         try:                               # 默认推荐 from weighted signals

@@ -348,6 +348,23 @@ h1{font-weight:700;letter-spacing:.02em;font-size:20px}
 .emptybox .go button:hover{border-color:var(--hbar)}
 .emptybox .go b{display:block;font-size:15.5px}.emptybox .go span{font-size:13px;color:var(--muted)}
 @media (max-width:420px){.tv{font-size:22px}.pbx b{font-size:17px}.rbr b{font-size:20px}}
+/* ---------- v4：本场倾向 ---------- */
+.lean{padding-bottom:10px;display:grid;gap:5px}
+.lr{display:flex;align-items:center;gap:8px;background:var(--panel2);border-radius:8px;padding:6px 10px;font-size:13.5px;min-width:0}
+.lr.g2,.lr.g3{background:color-mix(in srgb,var(--gold) 20%,var(--panel))}
+.lk{color:var(--muted);font-size:12.5px;font-weight:600;flex:0 0 auto;min-width:40px}
+.lv{font-weight:700;font-size:15px;white-space:nowrap}.lr.g0 .lv{font-weight:500;color:var(--muted);font-size:13.5px}
+.ld{letter-spacing:2px;font-size:11px;color:var(--gold);flex:0 0 auto}.ld i{font-style:normal;color:var(--line)}
+.lr.g2 .ld,.lr.g3 .ld{color:#b8860b}
+.lw{margin-left:auto;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dlg .lean{gap:8px;padding-bottom:12px}#dlg .lr{padding:10px 14px;font-size:14.5px}#dlg .lv{font-size:17px}
+.ev{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0 14px}
+.evh{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:8px}
+.evh b{font-size:17px}.evh .sub{font-size:13.5px}
+.evi{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.55}
+.evi .em{flex:0 0 18px;font-weight:700;text-align:center;line-height:1.55}.evi span{margin:0;padding:0;min-height:0}.evi.pro .em{color:var(--good)}.evi.con .em{color:var(--bad)}.evi.neu{color:var(--muted)}
+.evr{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+.hl>.hln.txt{font-family:inherit;font-size:19px}
 </style>
 </head>
 <body>
@@ -371,7 +388,7 @@ h1{font-weight:700;letter-spacing:.02em;font-size:20px}
   <div class="bar">
     <input id="q" placeholder="搜索球队或联赛">
     <select id="lg"><option value="">全部联赛</option></select>
-    <span class="seg" id="filt"><button class="on" data-f="all">全部</button><button data-f="reco">有推荐</button><button data-f="sig">有信号</button><button data-f="move">盘口变了</button></span>
+    <span class="seg" id="filt"><button class="on" data-f="all">全部</button><button data-f="reco">有倾向</button><button data-f="sig">有信号</button><button data-f="move">盘口变了</button></span>
     <span class="chip" id="sortScore">按信号强度排序</span>
   </div>
   <div id="list"><div class="empty">加载中…</div></div></div>
@@ -467,13 +484,37 @@ function probBar(m){
   return `<div class="pb"><div class="pbar">${n.map((p,i)=>`<i class="${cl[i]}" style="flex:${Math.max(p,0.02)}"></i>`).join("")}</div>
   <div class="pbx">${n.map((p,i)=>`<div><span class="k${i+1}">${lab[i]}</span><b>${pct(p)}</b>${chg(i)}<small>赔率 ${m.now.odds[i].toFixed(2)}</small></div>`).join("")}</div></div>`;
 }
+let LEANBT=null;
+const LSIDE={"主队":"","客队":"","大球":"up","小球":"down"};
+function leanRows(fx){
+  const L=fx.lean;if(!L)return"";
+  const row=(nm,x)=>{if(!x)return"";const g=x.grade||0;
+    const dots=g?`<span class="ld">${"●".repeat(g)}<i>${"●".repeat(3-g)}</i></span>`:"";
+    const why=g?`${x.pros} 条历史证据支持${x.cons?"，"+x.cons+" 条反对":""}`:(x.items.length?"":"历史样本不够");
+    return `<div class="lr g${g}"><span class="lk">${nm}</span><b class="lv ${LSIDE[x.side]||""}">${esc(x.label)}</b>${dots}<span class="lw">${why}</span></div>`};
+  const h=row("大小球",L.ou)+row("让球",L.ah);
+  return h?`<div class="lean">${h}</div>`:"";
+}
+const leanMax=fx=>Math.max(0,...Object.values(fx.lean||{}).map(x=>x.grade||0));
+function leanHTML(fx){
+  const L=fx.lean;if(!L)return `<div class="hint">这场没有盘口，或者历史里找不到可比的比赛。</div>`;
+  const GN={1:"略偏",2:"偏",3:"明显偏"};
+  const blk=(mk,nm)=>{const x=L[mk];if(!x)return"";
+    const bt=LEANBT&&x.grade&&LEANBT[mk]&&LEANBT[mk][x.grade];
+    return `<div class="ev"><div class="evh"><span class="sub">${nm}</span><b class="${LSIDE[x.side]||""}">${esc(x.label)}</b><span class="sub">现在的盘口：${esc(x.move)}（${esc(x.movedir)}）</span></div>
+    ${x.bet?`<div>照这个倾向买就是：<b>${esc(x.bet.what)}</b>，${esc(x.bet.book)} 赔率 <b class="num">${x.bet.odds.toFixed(2)}</b></div>`:""}
+    ${x.items.map(it=>{const pro=it.vote&&x.net&&((it.vote>0)===(x.net>0));const c=!it.vote?"neu":pro?"pro":"con";
+      return `<div class="evi ${c}"><span class="em">${!it.vote?"–":pro?"✓":"✗"}</span><span>${ft(fx,it.t)}${it.strong?"（这条算两票）":""}</span></div>`}).join("")||`<div class="hint">这个联赛和这两支球队，历史里还没有足够多同类变盘的比赛。</div>`}
+    ${bt&&bt.n?`<div class="evr">同样强度（${GN[x.grade]}）的倾向，过去照着买 ${bt.n} 次：赢 ${P(bt.win)}，每注回报 ${R(bt.roi)}。</div>`:""}</div>`};
+  return blk("ou","大小球")+blk("ah","让球（亚盘）")+`<div class="hint">怎么读：每一条都是"这个联赛 / 这支球队，盘口像今天这样变的时候，结果怎么样"。打出的比例明显高过当时价格隐含的比例（高 6 个点以上、场次够），才算支持一票；净票数 1 是略偏，2–3 是偏，4 以上是明显偏。它告诉你这场比赛的历史证据站在哪一边，不保证赢——过去照着买的战绩写在每块最下面，实盘战绩记在"信号战绩"里。</div>`;
+}
 function recoBand(fx){
   const r=fx.reco;if(!r||!refOf(fx))return"";
   const i=r.pick_i,b=r.best&&r.best[i],ev=r.ev&&r.ev[i];
   if(i==null||!b||ev==null)return `<div class="rb ${r.go?"go":"no"}">${esc(r.text||"")}</div>`;
   const evt=sgn((ev*100).toFixed(1))+"%";
   if(r.go)return `<div class="rb go"><div class="rbl"><span class="rtag">推荐</span><b>${esc(r.pick)}</b><span class="rodd">${b[0].toFixed(2)}<small>${esc(b[1])}</small></span>${r.p?`<span class="rbs">综合概率 ${pct(r.p[i])}${r.p_market?"，市场 "+pct(r.p_market[i]):""}</span>`:""}</div><div class="rbr"><b>${evt}</b><small>期望回报</small></div></div>`;
-  return `<div class="rb no"><b>不推荐下注</b><span>最接近的是${esc(r.pick)} ${b[0].toFixed(2)}，期望 ${evt}</span></div>`;
+  return "";
 }
 function tagTxt(f){
   if(f.k==="ou")return f.dir==="up"?"盘口往大球走":"盘口往小球走";
@@ -499,7 +540,7 @@ function cardHTML(fx){
   return `<div class="card ${fx.score>=3?"hot":""} ${ref?"":"bare"}" data-id="${esc(fx.id)}">
    <div class="meta"><span class="lgtag"><span class="lgpill">${esc(fx.league)}</span>${fx.country?`<span class="cty">${esc(zn(fx.country))}</span>`:""}</span><span class="ktime">${sortScore?`<small>${dmd(fx.start)}</small>`:""}${hm(fx.start)}${cdHTML(fx)}</span></div>
    <div class="teams"><div class="tm">${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><div class="vs">VS</div><div class="tm a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>
-   ${ref?recoBand(fx)+tiles(ref)+probBar(ref["1x2"])+tagsHTML(fx,4):`<div class="noodds">盘口还没开出来，开了以后这里会显示。</div>`}
+   ${ref?recoBand(fx)+leanRows(fx)+tiles(ref)+probBar(ref["1x2"])+tagsHTML(fx,4):`<div class="noodds">盘口还没开出来，开了以后这里会显示。</div>`}
    <div class="cfoot"><span>${ref?`${nf?nf+" 条信号":"没有信号"} · ${nb} 家盘口`:"暂无盘口"}</span><span>看详细分析 ›</span></div>
   </div>`;
 }
@@ -511,13 +552,15 @@ function hlHTML(){
     if(r&&r.go&&r.pick_i!=null&&r.best&&r.ev){const b=r.best[r.pick_i];items.push([0,fx,"推荐",`${nm}`,`买${r.pick} ${b[0].toFixed(2)}（${b[1]}）`,when,sgn((r.ev[r.pick_i]*100).toFixed(1))+"%",""]);continue}
     const v=fx.flags.filter(f=>f.k==="value"&&f.lv>=3).sort((a,b)=>b.ev-a.ev)[0];
     if(v){items.push([1,fx,"价格机会",nm,`${v.dir} ${v.odds?v.odds.toFixed(2):""}（${v.book||""}）`,when,"+"+(v.ev*100).toFixed(1)+"%",""]);continue}
+    const lb=Object.entries(fx.lean||{}).filter(([k,x])=>x.grade>=2).sort((a,b)=>b[1].grade-a[1].grade)[0];
+    if(lb){const x=lb[1];items.push([1,fx,"历史倾向",nm,`${x.bet.what} ${x.bet.odds.toFixed(2)}（${x.bet.book}）· ${x.pros} 条证据`,when,x.label,"txt"]);continue}
     const m=moveOf(fx);
     if(m&&fx.score>=3)items.push([2,fx,"盘口大变",nm,m[0],when,(m[1]>0?"▲":"▼")+Math.abs(m[1])+" 档",m[1]>0?"up":"down"]);
   }
   items.sort((a,b)=>a[0]-b[0]||a[1].start-b[1].start);
   const n=[0,1,2].map(k=>items.filter(x=>x[0]===k).length);
-  if(!items.length)return `<div class="hlnone">现在没有达到推荐门槛的比赛，也没有盘口大变的比赛。下面是全部赛程。</div>`;
-  return `<div class="hlt">现在最值得看<span>${[n[0]&&n[0]+" 个推荐",n[1]&&n[1]+" 个价格机会",n[2]&&n[2]+" 场盘口大变"].filter(Boolean).join(" · ")}</span></div>
+  if(!items.length)return `<div class="hlnone">现在没有价格机会、明显的历史倾向或盘口大变的比赛。下面是全部赛程。</div>`;
+  return `<div class="hlt">现在最值得看<span>${[n[0]&&n[0]+" 个价格推荐",n[1]&&n[1]+" 个价格机会或历史倾向",n[2]&&n[2]+" 场盘口大变"].filter(Boolean).join(" · ")}</span></div>
   <div class="hls">${items.slice(0,8).map(x=>`<button class="hl" onclick="openDlg('${esc(x[1].id)}')"><span class="hlk ${x[0]===2?"m":""}">${x[2]}</span><span class="hlm">${esc(x[3])}</span><span class="hls2">${esc(x[4])}</span><span class="hls2">${esc(x[5])}</span><span class="hln ${x[7]}">${x[6]}</span></button>`).join("")}</div>`;
 }
 let FILT="all",VIEW="board";
@@ -528,7 +571,7 @@ function setView(v){
   if(v==="jcPanel")renderJC();
   window.scrollTo(0,0);
 }
-const FILTS={all:()=>true,reco:f=>f.reco&&f.reco.go&&!!refOf(f),sig:f=>f.flags.length>0,move:f=>!!moveOf(f)};
+const FILTS={all:()=>true,reco:f=>!!refOf(f)&&((f.reco&&f.reco.go)||leanMax(f)>=1),sig:f=>f.flags.length>0,move:f=>!!moveOf(f)};
 function render(){
   if(!DATA) return;
   const q=$("#q").value.trim().toLowerCase(),lg=$("#lg").value;
@@ -767,7 +810,7 @@ function renderTrack(x){
   const LV=x.lv_names||{};
   const row=(lab,s)=>s&&s.n?`<tr><td>${lab}</td><td>${s.n}</td><td>${P(s.win)}</td><td>${P(s.push)}</td><td>${R(s.roi)} <span class="sub">${ciTxt(s.ci)}</span></td></tr>`:`<tr><td>${lab}</td><td>0</td><td>—</td><td>—</td><td class="sub">还没有已结算的</td></tr>`;
   const table=(g,keys)=>`<div class="scroll"><table class="ht"><tr><th>信号</th><th>场数</th><th>赢</th><th>走水</th><th>每注回报（95% 区间）</th></tr>${keys.map(k=>{const v=g[k];if(!v)return row(esc(x.labels[k]||k),null);
-    return row(`<b>${esc(v.label)}</b>`,v.all)+Object.entries(v.lv).map(([lv,s])=>row(`<span class="sub">　↳ ${LV[lv]||("等级 "+lv)}</span>`,s)).join("")}).join("")}</table></div>`;
+    return row(`<b>${esc(v.label)}</b>`,v.all)+Object.entries(v.lv).map(([lv,s])=>row(`<span class="sub">　↳ ${(k.startsWith("lean")?{1:"略偏",2:"偏",3:"明显偏"}:LV)[lv]||("等级 "+lv)}</span>`,s)).join("")}).join("")}</table></div>`;
   const keys=Object.keys(x.labels);
   const btKeys=keys.filter(k=>x.bt[k]);
   $("#trackPanel").innerHTML=`<h2>信号战绩：页面上的每条信号，照着买长期到底赚不赚</h2>
@@ -795,7 +838,7 @@ function recoHTML(fx){
 }
 function secJudge(fx){
   const d=fx.detail||{};
-  let h=`<div class="kh">默认推荐</div>`+recoHTML(fx);
+  let h=`<div class="kh">这场比赛的倾向：历史证据站在哪一边</div>`+leanHTML(fx)+`<div class="kh">价格检查：有没有哪家的赔率明显高过公平价</div>`+recoHTML(fx);
   const VC={"有效":"pos","值得盯":"","避坑":"neg","没有优势":"sub"};
   const rs=d.rules||[];
   h+=`<div class="kh">本场命中的看盘规律</div>`;
@@ -936,7 +979,7 @@ const pc0=x=>x==null?"—":(x*100).toFixed(0)+"%";
 const SECS=[
   ["chart","盘口走势",fx=>{const r=fx.books.pinnacle||Object.values(fx.books)[0];return r&&r.ou?`大小球变盘 ${r.ou.changes} 次`:"Pinnacle 开盘 → 现在"},secChart],
   ["signals","信号与战绩",fx=>fx.flags.length?`${fx.flags.length} 条信号，每类的历史回报`:"没有信号",secSignals],
-  ["judge","推荐、判断与规律",fx=>{if(fx.reco)return fx.reco.text;const d=fx.detail||{},rs=(d.rules||[]).filter(r=>r.verdict!=="没有优势");const r=fx.books.pinnacle&&fx.books.pinnacle["1x2"];
+  ["judge","倾向、证据与规律",fx=>{const L=fx.lean||{},lt=[L.ou&&"大小球"+L.ou.label,L.ah&&"让球"+L.ah.label].filter(Boolean);if(lt.length)return lt.join("；")+(fx.reco&&fx.reco.go?"；"+fx.reco.text:"");if(fx.reco)return fx.reco.text;const d=fx.detail||{},rs=(d.rules||[]).filter(r=>r.verdict!=="没有优势");const r=fx.books.pinnacle&&fx.books.pinnacle["1x2"];
     if(rs.length)return rs.map(r=>`${r.rule}：${r.verdict}`).join("；");
     return r?`市场：主胜 ${pc0(r.now.p[0])} · 平 ${pc0(r.now.p[1])} · 客胜 ${pc0(r.now.p[2])}${(d.rules||[]).length?`；命中 ${(d.rules||[]).length} 条规律，都没有优势`:""}`:"暂无盘口"},secJudge],
   ["move","历史同升降",fx=>{const m=((fx.detail||{}).same_move)||{};const a=m.ah,o=m.ou;const t=[];
@@ -953,7 +996,7 @@ function detailHTML(fx){
   const ref=fx.books.pinnacle||Object.values(fx.books)[0];
   let h=`<button class="x" onclick="closeDlg()">关闭</button><div class="dmeta"><span class="lgpill">${esc(fx.league)}</span>${fx.country?`<span>${esc(zn(fx.country))}</span>`:""}<span class="num">${fmtT(fx.start)}</span>${cdHTML(fx)}</div>
   <div class="dteams"><div>${zb(fx.home)}${formBoxes(fx.stats.home.all)}</div><span class="vs">VS</span><div class="a">${zb(fx.away)}${formBoxes(fx.stats.away.all)}</div></div>`;
-  h+=ref?recoBand(fx)+tiles(ref,true)+probBar(ref["1x2"]):`<div class="hint">盘口还没开出来。</div>`;
+  h+=ref?recoBand(fx)+leanRows(fx)+tiles(ref,true)+probBar(ref["1x2"]):`<div class="hint">盘口还没开出来。</div>`;
   const tf=topFlags(fx,3);if(tf)h+=`<div class="dsec">主要信号</div>${tf}`;
   h+=`<div class="dsec">点开看每一项</div>`;
   h+=`<div class="nav" style="margin-top:0">${SECS.map(([k,t,sum])=>`<button class="navrow" onclick="openSec('${esc(fx.id)}','${k}')"><span class="nt">${t}</span><span class="ns">${esc(sum(fx))}</span><span class="na">›</span></button>`).join("")}</div>`;
@@ -986,6 +1029,7 @@ function renderIdeas(x){
   <h3>按玩法</h3><div class="kv">${Object.entries((x&&x.market)||{}).map(([k,v])=>`<span>${k}：${rec(v)}</span>`).join("")}</div>
   <h3>按理由（哪类思路长期靠谱）</h3>${x&&Object.keys(x.tags||{}).length?`<table class="ht"><tr><th>理由</th><th>次数</th><th>赢</th><th>走水</th><th>回报</th></tr>${Object.entries(x.tags).map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.win}</td><td>${v.push}</td><td>${R(v.roi)}</td></tr>`).join("")}</table>`:"<p>还没有数据。点开任意比赛，用「提交思路」开始记录。</p>"}${learnHTML()}`;
 }
+fetch("lean.json?"+Date.now()).then(r=>r.json()).then(x=>LEANBT=x).catch(()=>{});
 fetch("track.json?"+Date.now()).then(r=>r.json()).then(renderTrack).catch(()=>renderTrack(null));
 fetch("learn.json?"+Date.now()).then(r=>r.json()).then(x=>LEARN=x).catch(()=>{}).then(()=>fetch("ideas.json?"+Date.now())).then(r=>r.json()).then(renderIdeas).catch(()=>renderIdeas(null));
 fetch("history.json?"+Date.now()).then(r=>r.json()).then(renderHist).catch(()=>renderHist(null));

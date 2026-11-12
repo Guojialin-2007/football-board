@@ -31,6 +31,8 @@ LABELS = {
     "form": "基本面和市场预期差 0.5 球以上：按基本面买",
     "conflict": "基本面和盘口方向矛盾：跟盘口买",
     "reco": "默认推荐（综合期望 ≥4%，按当时最好的价格）",
+    "lean_ah": "本场倾向·让球（历史证据的净票数：1 略偏，2 偏，3 明显偏）",
+    "lean_ou": "本场倾向·大小球（历史证据的净票数：1 略偏，2 偏，3 明显偏）",
 }
 
 
@@ -116,6 +118,11 @@ def extra_bets(fx, ref):
         k = rc["pick_i"]
         out["reco"] = {"mk": "1x2", "side": ("home", "draw", "away")[k], "line": None, "odds": rc["best"][k][0],
                        "book": rc["best"][k][1], "lv": 1, "g": "reco|1"}
+    for mk, ln in (fx.get("lean") or {}).items():
+        b = ln.get("bet")
+        if b and ln.get("grade"):
+            out[f"lean_{mk}"] = {"mk": mk, "side": b["side"], "line": b["line"], "odds": b["odds"], "book": b["book"],
+                                 "lv": ln["grade"], "g": f"lean_{mk}|{ln['grade']}"}
     ou = (ref or {}).get("ou")
     for f in fx.get("flags") or []:
         k = f.get("k")
