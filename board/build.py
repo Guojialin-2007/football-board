@@ -247,6 +247,11 @@ def run(inspect=False, log=print):
     led = api.sync_account()
     log(f"[papi] monthly allowance: {led['used']} of {led['limit']} used in {led['month']}"
         f"{' (used up)' if led.get('out') else ''}")
+    if led.get("hist_out"):
+        lp = os.path.join(DATA, "history", "listed.json")
+        ids = sorted(json.load(open(lp)).values(), key=lambda f: f.get("startTime") or "")[-1:] if os.path.exists(lp) else []
+        api.probe_history(ids[0]["fixtureId"] if ids else None)
+        log(f"[papi] odds endpoint {'still blocked' if api.ledger().get('hist_out') else 'served again'}")
     m = meta(api, log=log)
     T.fetch_results(DATA, days=300, log=log)
     teams = T.Teams(T.load_results(DATA, days=300))

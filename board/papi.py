@@ -105,13 +105,29 @@ class Papi:
         cap = int(led["limit"] * (1 - reserve) * frac) + 3
         return led["used"] + n <= min(cap, int(led["limit"] * (1 - reserve / 3)))
 
+    def probe_history(self, fixture_id):
+        """While the allowance is out, try one free odds call per run to see whether odds are served again."""
+        led = self.ledger()
+        if not led.get("hist_out") or not fixture_id:
+            return
+        self.probe = True
+        try:
+            self.get("/v4/historical-odds", fixtureId=fixture_id, bookmakers="pinnacle")
+        except RuntimeError:
+            pass
+        finally:
+            self.probe = False
+
     def quota_note(self):
         led = self.ledger()
-        return {"month": led["month"], "used": led["used"], "limit": led["limit"], "out": bool(led.get("out"))}
+        return {"month": led["month"], "used": led["used"], "limit": led["limit"], "out": bool(led.get("out")),
+                "odds_out": bool(led.get("hist_out"))}
 
     def get(self, path, **params):
         counted = path in COUNTED
-        if counted and self.ledger().get("out"):
+        led0 = self.ledger()
+        if (counted and led0.get("out")) or (path == "/v4/historical-odds" and led0.get("hist_out")
+                                             and not getattr(self, "probe", False)):
             raise QuotaExceeded(f"OddsPapi monthly allowance used up ({path} not called)")
         wait = COOLDOWN.get(path, 1.1) - (time.time() - self.last.get(path, 0))
         if wait > 0:
@@ -134,17 +150,22 @@ class Papi:
                 continue
             break
         self.calls[path] = self.calls.get(path, 0) + 1
-        if counted:
+        limit_hit = r.status_code == 429 and "LIMIT" in r.text.upper()
+        if counted or limit_hit or path == "/v4/historical-odds":
             led = self.ledger()
-            led["used"] += 1
-            if r.status_code == 429 and "LIMIT" in r.text.upper():
+            led["used"] += 1 if counted else 0
+            if limit_hit:
                 led["out"] = True
+                if path == "/v4/historical-odds":
+                    led["hist_out"] = True
                 m = re.search(r"limit of (\d+)", r.text)
                 if m:
                     led["limit"] = int(m.group(1))
                     led["used"] = max(led["used"], led["limit"])
+            if path == "/v4/historical-odds" and r.status_code == 200 and led.get("hist_out"):
+                led["hist_out"] = False
             self._save(led)
-            if led.get("out"):
+            if limit_hit:
                 raise QuotaExceeded(f"OddsPapi {path}: monthly allowance used up ({led['limit']} requests)")
         if r.status_code != 200:
             raise RuntimeError(f"OddsPapi {path} {r.status_code}: {r.text[:300].replace(self.key, '***')}")

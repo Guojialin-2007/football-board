@@ -24,7 +24,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import odds as O
 from . import stats as T
-from .papi import ts
+from .papi import QuotaExceeded, ts
 
 START = datetime(2026, 1, 15, tzinfo=timezone.utc)      # OddsPapi history starts around mid January 2026
 AH_NAMES = {0: "平手", 0.25: "平半", 0.5: "半球", 0.75: "半一", 1: "一球", 1.25: "一球/球半", 1.5: "球半",
@@ -206,10 +206,14 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
     sp = os.path.join(d, "state.json")
     st = json.load(open(sp)) if os.path.exists(sp) else {"weeks": {}, "tried": []}
     tried = set(st["tried"])
-    if st.get("v") != 2:                                   # results are now matched on both names at once: give
+    if st.get("v") == 2:                                   # 2026-11-22: runs while the allowance was out marked
+        have = {r.get("id") for r in load_rows(data_dir)}  # fixtures as tried without getting their odds
+        tried &= have
+        st["v"] = 3
+    if st.get("v") not in (2, 3):                                   # results are now matched on both names at once: give
         have = {r.get("id") for r in load_rows(data_dir)}  # every fixture dropped for "no score" another try
         tried &= have
-        st["v"] = 2
+        st["v"] = 3
     rows_path = os.path.join(d, "rows.jsonl")
     t0 = time.time()
     added = listed = 0
@@ -261,15 +265,20 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
             res = _score(f) or espn_score(teams, f)        # ESPN, both team names matched together
             if res is None and time.time() - (ts(f.get("startTime")) or 0) < 4 * 86400:
                 continue                                   # result not in yet: try again next run
-            tried.add(fid)
             if res is None:
+                tried.add(fid)
                 continue
             try:
                 js = api.get("/v4/historical-odds", fixtureId=fid, bookmakers="pinnacle")
+            except QuotaExceeded as e:
+                log(f"[history] stopped: {str(e)[:120]}")
+                break
             except RuntimeError as e:
+                tried.add(fid)
                 if " 404" not in str(e) and "NOT_FOUND" not in str(e):
                     log(f"[history] odds {fid}: {str(e)[:100]}")
                 continue
+            tried.add(fid)
             r = row_from(f, O.compact(js, cls, ["pinnacle"]), res)
             if r:
                 fh.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -308,7 +317,12 @@ def retime(api, cls, data_dir, budget_s, log=print):
         try:
             js = api.get("/v4/historical-odds", fixtureId=r["id"], bookmakers="pinnacle")
             nr = row_from(f, O.compact(js, cls, ["pinnacle"]), (r["hs"], r["as"]))
-        except RuntimeError:
+        except QuotaExceeded as e:
+            log(f"[history] rebuild stopped: {str(e)[:120]}")
+            break
+        except RuntimeError as e:
+            if " 404" not in str(e) and "NOT_FOUND" not in str(e):
+                continue                   # temporary failure: keep the row and try again later
             nr = None
         if nr:
             new[r["id"]] = nr
