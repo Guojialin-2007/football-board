@@ -26,6 +26,7 @@ from . import jc as JC
 from . import jcplan as JP
 from . import reco as RC
 from . import lean as LN
+from . import espn_odds as EO
 from . import track as TR
 from . import leagues as LG
 from . import polyleagues as P
@@ -277,14 +278,25 @@ def run(inspect=False, log=print):
                 f["_pm"] = LG.nl_tier(f.get("participant1Name"), f.get("participant2Name"))
         log(f"[board] {len(top)} chosen leagues: kept {len(kept)} of {len(fxs)} fixtures")
         fxs = kept
+    if env("ESPN_ODDS", "1") != "0":       # free second source: ESPN scoreboard odds (DraftKings / bet365)
+        try:
+            est = EO.record(DATA, EO.fetch(days=int(hours // 24) + 1, log=log))
+            known = [(f.get("participant1Name"), f.get("participant2Name"), ts(f.get("startTime")) or 0) for f in fxs]
+            dup = lambda e: any(abs(e["start"] - t) < 4 * 3600 and T.same_team(e["home"], h) and T.same_team(e["away"], a)
+                                for h, a, t in known)
+            extra = EO.fixtures(est, hours, skip=dup)
+            log(f"[espn] {len(extra)} matches added that OddsPapi did not list")
+            fxs = sorted(fxs + extra, key=lambda f: f.get("startTime") or "")
+        except Exception as e:             # noqa: BLE001  never lose the board because of the second source
+            log(f"[espn] skipped: {type(e).__name__}: {str(e)[:160]}")
     log(f"[board] {len(fxs)} fixtures in the next {hours:.0f} h; fetching odds for up to {min(max_fx, len(fxs))}")
     if inspect and fxs:
         log("[inspect] first fixture: " + json.dumps(fxs[0], ensure_ascii=False)[:800])
     now = time.time()
     cards, no_odds = [], 0
     for i, f in enumerate(fxs[:max_fx]):
-        comp = None
-        if time.time() - t0 < budget:
+        comp = f.get("_comp")
+        if comp is None and time.time() - t0 < budget:
             try:
                 comp = odds_for(api, f, m["markets"], books, log)
             except RuntimeError as e:

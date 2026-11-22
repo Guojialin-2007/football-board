@@ -238,7 +238,7 @@ def for_match(card, ix, fd=None):
     """{'ah': {...}, 'ou': {...}} or None. Each: dir (0/1 index into the side names, or None), label, grade, net,
     items (the evidence, strongest first), bet (what following the lean means right now)."""
     books = card.get("books") or {}
-    ref = books.get("pinnacle")
+    ref = books.get("pinnacle") or next(iter(books.values()), None)
     if not ref or ix is None:
         return None
     lg, home, away = card["league"], card["home"], card["away"]
