@@ -597,7 +597,9 @@ function init(d){
   g.textContent=`${fmtT(d.generated)} 更新（${age<60?age+" 分钟前":age<2880?Math.round(age/60)+" 小时前":Math.round(age/1440)+" 天前"}${age>150?"，数据可能过时":""}）`;g.classList.toggle("stale",age>150)}
   {const q=d.quota,n=$("#qnote"),fa=d.fixtures_at?Math.round((Date.now()/1000-d.fixtures_at)/86400):0;
    if(q&&q.out){const [y,mo]=q.month.split("-").map(Number),nx=mo===12?`${y+1} 年 1 月 1 日`:`${mo+1} 月 1 日`;
-     n.innerHTML=`<b>赛程暂停更新：</b>盘口数据源免费账号本月 ${q.limit} 次的赛程查询额度已经用完，${nx}自动恢复。期间新比赛进不来${fa>=1?`（赛程最后更新是 ${fa} 天前）`:""}${q.odds_out?"，赔率也暂时拿不到":"，已知比赛的赔率照常更新"}。`;n.hidden=false}
+     const es=d.fixtures.filter(f=>String(f.id).startsWith("espn")).length;
+     if(es){n.innerHTML=`<b>现在用的是 ESPN 免费数据：</b>主数据源（OddsPapi）本月额度已用完，${nx}恢复。这 ${es} 场的盘口来自 DraftKings（开盘价和现在的价），没有 Pinnacle，所以“价格机会”和竞彩计算暂时没有。`;n.hidden=false}
+     else n.innerHTML=`<b>赛程暂停更新：</b>盘口数据源免费账号本月 ${q.limit} 次的赛程查询额度已经用完，${nx}自动恢复。期间新比赛进不来${fa>=1?`（赛程最后更新是 ${fa} 天前）`:""}${q.odds_out?"，赔率也暂时拿不到":"，已知比赛的赔率照常更新"}。`;n.hidden=false}
    else n.hidden=true}
   const s=d.summary;
   const ORDER={};(d.leagues||[]).forEach((x,i)=>ORDER[x.league]=i);
