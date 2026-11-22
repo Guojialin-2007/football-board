@@ -1,9 +1,9 @@
 """Probe free sources (run in GitHub Actions): ESPN scoreboard odds, football-data fixtures CSVs."""
 import csv, io, json, requests
 s = requests.Session(); s.headers["User-Agent"] = "Mozilla/5.0"
-for lg in ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1", "mex.1", "bra.1", "jpn.1", "ksa.1", "eng.2", "ned.1", "por.1", "tur.1", "arg.1", "aus.1", "kor.1"]:
+for lg in ["all", "eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1", "mex.1", "bra.1", "jpn.1", "ksa.1", "eng.2", "ned.1", "por.1", "tur.1", "arg.1", "aus.1", "kor.1"]:
     try:
-        r = s.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/scoreboard", params={"dates": "20261122-20261130"}, timeout=30)
+        r = s.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/scoreboard", params={"dates": "20261128", "limit": 500}, timeout=30)
         ev = r.json().get("events", [])
         n_odds = 0; ex = None
         for e in ev:
@@ -11,10 +11,11 @@ for lg in ["eng.1", "esp.1", "ger.1", "ita.1", "fra.1", "uefa.champions", "usa.1
                 if c.get("odds"):
                     n_odds += 1; ex = ex or c["odds"][0]
         print("ESPN", lg, r.status_code, "events", len(ev), "with odds", n_odds)
-        if ex: print("   sample odds:", json.dumps(ex)[:700])
+        if ex: print("   sample odds:", json.dumps(ex)[:900])
+        if lg == "all": print("   leagues:", sorted({e.get("league", {}).get("slug") or e.get("uid","")[:30] for e in ev})[:60])
     except Exception as e:
         print("ESPN", lg, "ERR", type(e).__name__, str(e)[:100])
-for u in ["https://www.football-data.co.uk/fixtures.csv", "https://www.football-data.co.uk/new_league_fixtures.csv"]:
+for u in []:
     try:
         r = s.get(u, timeout=30); print("FD", u, r.status_code, len(r.content))
         rows = list(csv.DictReader(io.StringIO(r.content.decode("latin-1").lstrip("﻿"))))
