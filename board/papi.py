@@ -12,10 +12,22 @@ import sys
 import time
 from datetime import datetime
 
+import json
+import re
 import requests
 
 HOST = "https://api.oddspapi.io"
 COOLDOWN = {"/v4/historical-odds": 5.2, "/v4/fixtures": 2.1, "/v4/markets": 1.1}
+
+
+# endpoints that use the monthly allowance (https://oddspapi.io/en/docs/requests-and-quota); the free plan's quota
+# resets at 00:00 UTC on the 1st of each calendar month
+COUNTED = {"/v4/players", "/v4/settlements", "/v4/fixtures", "/v4/fixture", "/v4/odds-by-tournaments", "/v4/languages",
+           "/v4/sports", "/v4/bookmakers", "/v4/markets", "/v4/tournaments", "/v4/participants", "/v4/scores", "/v4/odds"}
+
+
+class QuotaExceeded(RuntimeError):
+    pass
 
 
 class Papi:
@@ -28,7 +40,79 @@ class Papi:
         self.sleep = sleep
         self.calls = {}
 
+    # ---- monthly allowance -------------------------------------------------------------------------------------
+    ledger_path = None                     # set by the caller (data/quota.json): counted calls this month, committed
+
+    def _month(self):
+        return datetime.utcnow().strftime("%Y-%m")
+
+    def ledger(self):
+        led = {}
+        if self.ledger_path and os.path.exists(self.ledger_path):
+            try:
+                led = json.load(open(self.ledger_path))
+            except (OSError, ValueError):
+                led = {}
+        if led.get("month") != self._month():
+            led = {"month": self._month(), "used": 0, "limit": led.get("limit") or 250, "out": False}
+        return led
+
+    def _save(self, led):
+        if self.ledger_path:
+            os.makedirs(os.path.dirname(self.ledger_path), exist_ok=True)
+            json.dump(led, open(self.ledger_path, "w"))
+
+    def sync_account(self):
+        """/v4/account is free: read the plan's limit and what is used (field names guessed defensively)."""
+        led = self.ledger()
+        try:
+            js = self.get("/v4/account")
+        except Exception as e:             # noqa: BLE001  never stop the board over the account call
+            print(f"[papi] account not read: {str(e)[:120]}", file=sys.stderr)
+            return led
+        flat = {}
+
+        def walk(x, pre=""):
+            if isinstance(x, dict):
+                for k, v in x.items():
+                    walk(v, f"{pre}{k}.".lower())
+            elif isinstance(x, (int, float)) and not isinstance(x, bool):
+                flat[pre.rstrip(".")] = x
+        walk(js)
+        lim = next((v for k, v in flat.items() if "limit" in k and "request" in k), None)
+        used = next((v for k, v in flat.items() if "request" in k and ("used" in k or "count" in k or "made" in k)), None)
+        left = next((v for k, v in flat.items() if "request" in k and ("remain" in k or "left" in k)), None)
+        print(f"[papi] account fields: {sorted(flat)}", file=sys.stderr)
+        if lim:
+            led["limit"] = int(lim)
+        if used is not None:
+            led["used"] = max(led["used"], int(used))
+        elif left is not None and led.get("limit"):
+            led["used"] = max(led["used"], int(led["limit"]) - int(left))
+        self._save(led)
+        return led
+
+    def allow(self, n=1, reserve=0.12):
+        """May we spend n counted calls now? Keeps to an even pace through the month, holding back `reserve`
+        of the allowance for the last days, and never after the plan has said the limit is reached."""
+        led = self.ledger()
+        if led.get("out"):
+            return False
+        now = datetime.utcnow()
+        import calendar
+        days = calendar.monthrange(now.year, now.month)[1]
+        frac = min(1.0, (now.day - 1 + now.hour / 24 + 1 / 24) / days + 1 / days)    # one day ahead of the even pace
+        cap = int(led["limit"] * (1 - reserve) * frac) + 3
+        return led["used"] + n <= min(cap, int(led["limit"] * (1 - reserve / 3)))
+
+    def quota_note(self):
+        led = self.ledger()
+        return {"month": led["month"], "used": led["used"], "limit": led["limit"], "out": bool(led.get("out"))}
+
     def get(self, path, **params):
+        counted = path in COUNTED
+        if counted and self.ledger().get("out"):
+            raise QuotaExceeded(f"OddsPapi monthly allowance used up ({path} not called)")
         wait = COOLDOWN.get(path, 1.1) - (time.time() - self.last.get(path, 0))
         if wait > 0:
             self.sleep(wait)
@@ -50,6 +134,18 @@ class Papi:
                 continue
             break
         self.calls[path] = self.calls.get(path, 0) + 1
+        if counted:
+            led = self.ledger()
+            led["used"] += 1
+            if r.status_code == 429 and "LIMIT" in r.text.upper():
+                led["out"] = True
+                m = re.search(r"limit of (\d+)", r.text)
+                if m:
+                    led["limit"] = int(m.group(1))
+                    led["used"] = max(led["used"], led["limit"])
+            self._save(led)
+            if led.get("out"):
+                raise QuotaExceeded(f"OddsPapi {path}: monthly allowance used up ({led['limit']} requests)")
         if r.status_code != 200:
             raise RuntimeError(f"OddsPapi {path} {r.status_code}: {r.text[:300].replace(self.key, '***')}")
         return r.json()

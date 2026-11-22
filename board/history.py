@@ -216,13 +216,23 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
     end = datetime.now(timezone.utc) - timedelta(days=1)
     wk = end
     queue = []
-    while wk > START and time.time() - t0 < budget_s:
+    lp = os.path.join(d, "listed.json")              # fixtures seen in the upcoming lists: no allowance needed
+    if os.path.exists(lp):
+        done = time.time() - 3 * 3600
+        for f in sorted(json.load(open(lp)).values(), key=lambda f: f.get("startTime") or "", reverse=True):
+            st_ = ts(f.get("startTime")) or 0
+            if st_ < done and str(f.get("fixtureId")) not in tried and \
+                    (allowed is None or str(f.get("tournamentId")) in allowed):
+                queue.append(f)
+    while wk > START and time.time() - t0 < budget_s and len(queue) <= 400:
         a = wk - timedelta(days=window_days)
         key = a.strftime("%Y-%m-%d")
-        recent = (end - wk).days < 14                    # recent weeks: re-list once a day, results arrive late
         info = st["weeks"].get(key)
-        stale = isinstance(info, dict) and recent and time.time() - info.get("at", 0) > 20 * 3600
-        if info is None or stale:
+        allow = getattr(api, "allow", None)
+        if info is None and allow is not None and not allow(3):
+            wk = a                                       # older weeks are listed only while the allowance has room
+            continue
+        if info is None:
             try:
                 fx = api.get("/v4/fixtures", sportId=sid, statusId=2,
                              **{"from": a.strftime("%Y-%m-%dT00:00:00Z"), "to": wk.strftime("%Y-%m-%dT00:00:00Z")})
@@ -237,7 +247,8 @@ def backfill(api, sid, cls, data_dir, teams, budget_s, log=print, window_days=7,
             p = os.path.join(d, f"fx_{key}.json")
             fx = json.load(open(p)) if os.path.exists(p) else []
         # (no hasOdds filter here: finished matches report hasOdds=false once their markets close)
-        queue += [f for f in fx if str(f.get("fixtureId")) not in tried
+        have = {str(f.get("fixtureId")) for f in queue}
+        queue += [f for f in fx if str(f.get("fixtureId")) not in tried and str(f.get("fixtureId")) not in have
                   and (allowed is None or str(f.get("tournamentId")) in allowed)]
         if len(queue) > 400:
             break

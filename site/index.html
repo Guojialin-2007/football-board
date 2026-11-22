@@ -348,6 +348,9 @@ h1{font-weight:700;letter-spacing:.02em;font-size:20px}
 .emptybox .go button:hover{border-color:var(--hbar)}
 .emptybox .go b{display:block;font-size:15.5px}.emptybox .go span{font-size:13px;color:var(--muted)}
 @media (max-width:420px){.tv{font-size:22px}.pbx b{font-size:17px}.rbr b{font-size:20px}}
+.qnote{background:#fff4d6;color:#5a4200;border-bottom:1px solid #f0d98a;font-size:14.5px;line-height:1.6;padding:10px 16px;text-align:center}
+.qnote b{color:#3a2a00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .qnote{background:#3a3010;color:#f2dfa6;border-color:#5a4a18}:root:not([data-theme="light"]) .qnote b{color:#fff0c0}}
 /* ---------- v4：本场倾向 ---------- */
 .lean{padding-bottom:10px;display:grid;gap:5px}
 .lr{display:flex;align-items:center;gap:8px;background:var(--panel2);border-radius:8px;padding:6px 10px;font-size:13.5px;min-width:0}
@@ -382,6 +385,7 @@ h1{font-weight:700;letter-spacing:.02em;font-size:20px}
     <button class="tab" data-v="ideasPanel">思路战绩</button>
   </nav>
 </div></header>
+<div class="qnote" id="qnote" hidden></div>
 <section class="hlband" id="hlband" hidden><div class="wrap" id="hl"></div></section>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
 <main class="wrap"><div id="hist" hidden></div><div id="jcPanel" class="panel" hidden></div><div id="rulesPanel" class="panel" hidden></div><div id="trackPanel" class="panel" hidden></div><div id="ideasPanel" hidden></div><div id="board">
@@ -591,6 +595,10 @@ function init(d){
   DATA=d;
   {const age=Math.max(0,Math.round((Date.now()/1000-d.generated)/60)),g=$("#gen");
   g.textContent=`${fmtT(d.generated)} 更新（${age<60?age+" 分钟前":age<2880?Math.round(age/60)+" 小时前":Math.round(age/1440)+" 天前"}${age>150?"，数据可能过时":""}）`;g.classList.toggle("stale",age>150)}
+  {const q=d.quota,n=$("#qnote"),fa=d.fixtures_at?Math.round((Date.now()/1000-d.fixtures_at)/86400):0;
+   if(q&&q.out){const [y,mo]=q.month.split("-").map(Number),nx=mo===12?`${y+1} 年 1 月 1 日`:`${mo+1} 月 1 日`;
+     n.innerHTML=`<b>赛程暂停更新：</b>盘口数据源免费账号本月 ${q.limit} 次的赛程查询额度已经用完，${nx}自动恢复。期间新比赛进不来${fa>=1?`（赛程最后更新是 ${fa} 天前）`:""}，已知比赛的赔率照常更新。`;n.hidden=false}
+   else n.hidden=true}
   const s=d.summary;
   const ORDER={};(d.leagues||[]).forEach((x,i)=>ORDER[x.league]=i);
   $("#stats").innerHTML=`<span><b>${s.fixtures}</b>场比赛</span><span><b>${s.with_odds}</b>有盘口</span><span><b>${s.flags}</b>有信号</span>`;

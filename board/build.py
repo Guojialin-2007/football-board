@@ -42,12 +42,25 @@ SITE = os.path.join(ROOT, "site")
 META_V = 2          # 2: team totals and "2Up" results no longer mixed into O/U and 1X2
 
 
-def meta(api, refresh_days=7, log=print):
-    """Soccer sport id, recognised markets and tournament names - cached because they use the monthly allowance."""
+def meta(api, refresh_days=30, log=print):
+    """Soccer sport id, recognised markets and tournament names - cached because they use the monthly allowance.
+    A stale copy is kept (and used) when the allowance is short: these lists hardly change."""
     path = os.path.join(DATA, "meta.json")
     m = json.load(open(path)) if os.path.exists(path) else {}
-    if m and m.get("v") == META_V and time.time() - m.get("at", 0) < refresh_days * 86400 and m.get("markets"):
+    ok = m and m.get("v") == META_V and m.get("markets")
+    if ok and (time.time() - m.get("at", 0) < refresh_days * 86400 or not api.allow(4)):
         return m
+    try:
+        return _meta_fetch(api, log)
+    except RuntimeError as e:
+        if ok:
+            log(f"[meta] refresh failed, using the copy from {time.strftime('%Y-%m-%d', time.gmtime(m['at']))}: {str(e)[:120]}")
+            return m
+        raise
+
+
+def _meta_fetch(api, log):
+    path = os.path.join(DATA, "meta.json")
     sports = api.get("/v4/sports")
     sp = next((s for s in sports if name(s).strip().lower() in ("soccer", "football")), None)
     if not sp:
@@ -61,6 +74,8 @@ def meta(api, refresh_days=7, log=print):
             tours[str(tid)] = {"name": name(t), "country": t.get("categoryName") or ""}
     except RuntimeError as e:
         log(f"[meta] tournaments not loaded: {e}")
+        old = json.load(open(path)) if os.path.exists(path) else {}
+        tours = old.get("tours") or {}
     kinds = {}
     for v in cls.values():
         kinds[v["kind"]] = kinds.get(v["kind"], 0) + 1
@@ -82,14 +97,43 @@ def upcoming_cached(api, sid, hours, every_h, log=print):
     p = os.path.join(DATA, "fixtures.json")
     c = json.load(open(p)) if os.path.exists(p) else {}
     now = time.time()
-    if c.get("at") and now - c["at"] < every_h * 3600 - 900 and c.get("hours", 0) >= hours + every_h - 1:
-        rows = [f for f in c["rows"] if (ts(f.get("startTime")) or 0) > now and (ts(f.get("startTime")) or 0) < now + hours * 3600]
-        log(f"[board] fixture list from cache ({(now - c['at']) / 3600:.1f} h old)")
+    ahead = max(hours + every_h, float(os.environ.get("FIXTURES_AHEAD_H") or 168))   # a week: survives a dry spell
+
+    def cached(why):
+        rows = [f for f in c.get("rows") or [] if now < (ts(f.get("startTime")) or 0) < now + hours * 3600]
+        log(f"[board] fixture list from cache ({(now - c.get('at', now)) / 3600:.1f} h old; {why}; {len(rows)} in window)")
         return rows, False
-    rows = upcoming(api, sid, hours + every_h)
+    if c.get("at") and now - c["at"] < every_h * 3600 - 900 and c.get("hours", 0) >= hours + every_h - 1:
+        return cached("fresh enough")
+    if c.get("rows") and not api.allow(1):
+        return cached("saving the monthly allowance")
+    try:
+        rows = upcoming(api, sid, ahead)
+    except RuntimeError as e:
+        if c.get("rows") is not None:
+            log(f"[board] fixture list not refreshed: {str(e)[:140]}")
+            return cached("refresh failed")
+        raise
     os.makedirs(DATA, exist_ok=True)
-    json.dump({"at": now, "hours": hours + every_h, "rows": rows}, open(p, "w"), ensure_ascii=False)
+    json.dump({"at": now, "hours": ahead, "rows": rows}, open(p, "w"), ensure_ascii=False)
+    archive_fixtures(rows)
     return [f for f in rows if (ts(f.get("startTime")) or 0) < now + hours * 3600], True
+
+
+def archive_fixtures(rows):
+    """Every fixture ever listed (id, teams, time, tournament): the history job takes finished matches from here
+    instead of listing past weeks again (which would use the monthly allowance)."""
+    p = os.path.join(DATA, "history", "listed.json")
+    a = json.load(open(p)) if os.path.exists(p) else {}
+    keep = ("fixtureId", "participant1Name", "participant2Name", "startTime", "tournamentId", "tournamentName",
+            "categoryName", "sportId")
+    for f in rows:
+        if f.get("fixtureId"):
+            a[str(f["fixtureId"])] = {k: f.get(k) for k in keep}
+    cut = time.time() - 120 * 86400
+    a = {k: v for k, v in a.items() if (ts(v.get("startTime")) or 0) > cut}
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    json.dump(a, open(p, "w"), ensure_ascii=False)
 
 
 def upcoming(api, sid, hours):
@@ -199,6 +243,10 @@ def run(inspect=False, log=print):
     hist_budget = float(env("HIST_MIN", 35)) * 60
     books = [b.strip() for b in env("BOOKS", "pinnacle,bet365,1xbet").split(",") if b.strip()][:3]
     api = Papi()
+    api.ledger_path = os.path.join(DATA, "quota.json")
+    led = api.sync_account()
+    log(f"[papi] monthly allowance: {led['used']} of {led['limit']} used in {led['month']}"
+        f"{' (used up)' if led.get('out') else ''}")
     m = meta(api, log=log)
     T.fetch_results(DATA, days=300, log=log)
     teams = T.Teams(T.load_results(DATA, days=300))
@@ -365,7 +413,10 @@ def run(inspect=False, log=print):
         log(f"[history] backfill stopped: {type(e).__name__}: {str(e)[:160]}")
     agg = H.aggregate(DATA, tmap, fdx)
     json.dump(agg, open(os.path.join(SITE, "history.json"), "w"), ensure_ascii=False)
-    out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards,
+    q = api.quota_note()
+    fc = json.load(open(os.path.join(DATA, "fixtures.json"))) if os.path.exists(os.path.join(DATA, "fixtures.json")) else {}
+    out = {"generated": int(time.time()), "hours": hours, "books": books, "fixtures": cards, "quota": q,
+           "fixtures_at": int(fc.get("at") or 0),
            "repo": os.environ.get("GITHUB_REPOSITORY", ""),
            "leagues": [{"league": x["league"], "volume": x["volume"]} for x in (top or [])],
            "summary": {"fixtures": len(cards), "with_odds": len(cards) - no_odds, "with_stats": matched,
